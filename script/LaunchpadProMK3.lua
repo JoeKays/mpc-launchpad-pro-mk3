@@ -1598,6 +1598,12 @@ local function enterPadsMode()
 		end
 	end
 	log("pads mode on (" .. padsLayout .. ")")
+	if padsLayout == "pads64" then
+		-- the 8x8 view itself is a screen-side setting with no script API; without it
+		-- the MPC stays in the 16-pad view and the upper pad colours/banks do not
+		-- populate (there is no 8x8 mode for drum kits at all)
+		logOnce("tip8x8", "tip: switch the MPC's pad view to 8x8 64 Pads for full colours")
+	end
 end
 
 -- Pick the first layout from the current track's Type: pad-based programs (Drum)

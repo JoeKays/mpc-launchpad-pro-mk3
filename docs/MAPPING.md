@@ -215,8 +215,11 @@ is silent on drum programs and the drum grid is meaningless on a synth track. CC
   unbound from the script and bound with `mappings.pads.AddNoteToMpcPad` (bank A only,
   device-verified), so the pads play the MPC's own pad bank; the quadrant mirrors the
   MPC pad colours.
-- **pads64**: the whole 8x8 grid maps 1:1 to the program's 64 pads, matching MPC
-  3.10.1's native "8x8: 64 Pads Mode" — row-major, each grid row is one pad bank
+- **pads64** (melodic tracks only; the MPC has no 8x8 mode for drum kits): the whole
+  8x8 grid maps 1:1 to the program's 64 pads, matching MPC 3.10.1's native
+  "8x8: 64 Pads Mode". The 8x8 view itself is a screen-side setting with no script
+  API: switch the MPC away from the initial 16-pad view once and the full colours and
+  pad banks populate (the journal prints a tip on entry) — row-major, each grid row is one pad bank
   (bottom row = bank A, eight banks A-H of eight pads), driven through
   `mappings.pads.AddNoteToVirtualPad` (virtual pad N = program pad N+1). LEDs: every pad
   mirrors its MPC colour from `controlSurface.pads.virtual[i]` (the 128 virtual pads;
