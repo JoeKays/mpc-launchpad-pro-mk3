@@ -32,15 +32,15 @@ assert_near(mock.tracks[0].Volume.value, 1.0, "volume top row = 1.0")
 assert_eq(mock.leds[11][1], 0, "fader bottom red")
 assert_eq(mock.leds[11][2], 127, "fader bottom green")
 assert_eq(mock.leds[11][3], 127, "fader bottom blue")
--- Grid pad col 0, bottom row (note 11) -> track 0 volume 0.0.
+-- Grid pad col 0, bottom row (note 11) -> track 0 volume 1/8.
 L.HandleMIDINoteOn(0, 11, 100)
-assert_near(mock.tracks[0].Volume.value, 0.0, "volume bottom row = 0.0")
+assert_near(mock.tracks[0].Volume.value, 1 / 8, "volume bottom row = 1/8")
 -- Up nudges +1/8.
 L.HandleMIDICC(0, 80, 127)
-assert_near(mock.tracks[0].Volume.value, 0.125, "volume up 1/8")
+assert_near(mock.tracks[0].Volume.value, 2 / 8, "volume up 1/8")
 -- Down nudges -1/8 and clamps at 0.
 L.HandleMIDICC(0, 70, 127)
-assert_near(mock.tracks[0].Volume.value, 0.0, "volume down 1/8")
+assert_near(mock.tracks[0].Volume.value, 1 / 8, "volume down 1/8")
 L.HandleMIDICC(0, 70, 127)
 assert_near(mock.tracks[0].Volume.value, 0.0, "volume clamped at 0")
 -- Up clamps at 1.
@@ -49,12 +49,12 @@ assert_near(mock.tracks[0].Volume.value, 1.0, "volume clamped at 1")
 
 -- Pan menu: press CC 5.
 L.HandleMIDICC(0, 5, 127)
--- Grid pad col 1, row 4 (note 42) -> track 1 pan 3/7.
+-- Grid pad col 1, row 4 (note 42) -> track 1 pan 4/8 = 0.5.
 L.HandleMIDINoteOn(0, 42, 100)
-assert_near(mock.tracks[1].Pan.value, 3 / 7, "pan row 4 = 3/7")
+assert_near(mock.tracks[1].Pan.value, 4 / 8, "pan row 4 = 0.5")
 -- Up nudges +1/8.
 L.HandleMIDICC(0, 80, 127)
-assert_near(mock.tracks[1].Pan.value, 3 / 7 + 1 / 8, "pan up 1/8")
+assert_near(mock.tracks[1].Pan.value, 5 / 8, "pan up 1/8")
 
 -- Sends menu: press CC 6.
 L.HandleMIDICC(0, 6, 127)
@@ -65,12 +65,12 @@ assert_near(mock.tracks[2].Send1.value, 1.0, "send 1 = 1.0")
 L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 6, 127)
 L.HandleMIDICC(0, 90, 0)
--- Grid pad col 2, row 3 (note 53) -> track 2 send 2 = 4/7.
+-- Grid pad col 2, row 3 (note 53) -> track 2 send 2 = 5/8.
 L.HandleMIDINoteOn(0, 53, 100)
-assert_near(mock.tracks[2].Send2.value, 4 / 7, "send 2 = 4/7")
+assert_near(mock.tracks[2].Send2.value, 5 / 8, "send 2 = 5/8")
 -- Up nudges the active send by +1/8.
 L.HandleMIDICC(0, 80, 127)
-assert_near(mock.tracks[2].Send2.value, 4 / 7 + 1 / 8, "send 2 up 1/8")
+assert_near(mock.tracks[2].Send2.value, 6 / 8, "send 2 up 1/8")
 
 -- Exit the menu: press CC 6 again.
 L.HandleMIDICC(0, 6, 127)

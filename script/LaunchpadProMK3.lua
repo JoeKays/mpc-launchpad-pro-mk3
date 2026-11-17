@@ -364,18 +364,24 @@ local function paintAdjustGrid()
 	for col = 0, GRID_COLS - 1 do
 		local gc = globalPos(col, 0)
 		local t = trackAt(gc)
-		local value = t and propValue(t, name) or 0
-		if type(value) ~= "number" then
-			value = 0
-		end
-		local litFromBottom = math.floor(value * (GRID_ROWS - 1) + 0.5)
-		for row = 0, GRID_ROWS - 1 do
-			local idx = 10 * (8 - row) + col + 1
-			local fromBottom = 7 - row
-			if fromBottom <= litFromBottom then
-				ledRGB(idx, colour[1], colour[2], colour[3])
-			else
-				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+		if t then
+			local value = propValue(t, name) or 0
+			if type(value) ~= "number" then
+				value = 0
+			end
+			local litCount = math.floor(value * GRID_ROWS + 0.5)
+			for row = 0, GRID_ROWS - 1 do
+				local idx = 10 * (8 - row) + col + 1
+				local fromBottom = 7 - row
+				if fromBottom < litCount then
+					ledRGB(idx, colour[1], colour[2], colour[3])
+				else
+					ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+				end
+			end
+		else
+			for row = 0, GRID_ROWS - 1 do
+				ledOff(10 * (8 - row) + col + 1)
 			end
 		end
 	end
@@ -480,7 +486,11 @@ local function paintTrack()
 				end
 			end
 		end
-		ledRGB(101 + col, r, g, b)
+		if t then
+			ledRGB(101 + col, r, g, b)
+		else
+			ledOff(101 + col)
+		end
 	end
 end
 
@@ -791,7 +801,7 @@ local function handleAdjustPad(col, row)
 	if not adjustMode then
 		return
 	end
-	local value = (GRID_ROWS - 1 - row) / (GRID_ROWS - 1)
+	local value = (GRID_ROWS - row) / GRID_ROWS
 	adjustCol = col
 	local gc = globalPos(col, 0)
 	local name = adjustPropName()
@@ -960,11 +970,6 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			heldFunction = nil
 			paintTrack()
 			flushLEDs()
-		end
-		if cc == LEFT.duplicate or cc == LEFT.clear then
-			clipOp = nil
-			clipOrigin = nil
-			paintAll()
 		end
 		return
 	end
