@@ -162,10 +162,14 @@ GetPosition())` with the delta clamped to ±127, repeated at most twice to absor
 string)`. If a qlink object has no `Twist`, the script falls back to `SetPosition(target)`
 and logs `qlink N = pos (setpos)` — `SetPosition` alone updates the Q-Link's ValueString
 but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMITATIONS).
-All 16 Q-Links are mapped: page 1 = Q-Links 0-7, page 2 = Q-Links 8-15 (tapping
-Device cycles page 1 -> page 2 -> exit). The 16 Q-Links are the MPC's four Q-Link
-banks of 4 knobs; each bank has its own fader colour — bank 1 (Q-Links 0-3) cyan,
-bank 2 (4-7) magenta, bank 3 (8-11) yellow, bank 4 (12-15) blue — on both pages.
+All 16 Q-Links are reachable, **compacted**: only the assigned Q-Links (non-empty
+target name) get columns, packed left-to-right with no dark gaps between faders; the
+page-open log line lists the map (`qlink page (N assigned): 1=name, 2=name, ...`).
+Page 1 = the first 8 assigned Q-Links, page 2 = the rest; tapping Device cycles
+page 1 -> page 2 -> exit (a page-2 tap is skipped when 8 or fewer are assigned).
+Each fader keeps its MPC Q-Link bank colour — bank 1 (Q-Links 0-3) cyan, bank 2
+(4-7) magenta, bank 3 (8-11) yellow, bank 4 (12-15) blue — so the grouping stays
+visible after compaction.
 
 Flip/binary parameters (two value strings across a wide position span, e.g. Kill EQ
 Thru/Kill) are learned as you use them: once learned, presses round to the extremes

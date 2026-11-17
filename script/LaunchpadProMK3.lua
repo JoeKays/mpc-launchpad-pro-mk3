@@ -743,13 +743,32 @@ local function qlinkColour(i)
 	return QLINK_BANK_COLOURS[math.floor(i / 4) + 1] or C.cyan
 end
 
-local function paintQlinkGrid()
+-- Columns show only the ASSIGNED Q-Links, compacted left-to-right with no gaps
+-- (unassigned slots would leave dark columns in between). Page 1 = the first 8
+-- assigned Q-Links, page 2 = the rest; the list is rebuilt on every paint.
+local qlinkColumnMap = {}
+
+local function buildQlinkColumnMap()
+	qlinkColumnMap = {}
 	local count = qlinkCount()
+	for i = 0, count - 1 do
+		if qlinkAssigned(i) then
+			qlinkColumnMap[#qlinkColumnMap + 1] = i
+		end
+	end
+end
+
+local function qlinkForColumn(col)
+	return qlinkColumnMap[qlinkPage * GRID_COLS + col + 1]
+end
+
+local function paintQlinkGrid()
+	buildQlinkColumnMap()
 	for col = 0, GRID_COLS - 1 do
-		local i = qlinkPage * GRID_COLS + col
-		local assigned = i < count and qlinkAssigned(i)
+		local i = qlinkForColumn(col)
+		local assigned = i ~= nil
 		local pos = assigned and qlinkPosition(i) or 0
-		local colour = qlinkColour(i)
+		local colour = qlinkColour(i or 0)
 		local litCount = math.floor(pos / 127 * GRID_ROWS + 0.5)
 		for row = 0, GRID_ROWS - 1 do
 			local idx = 10 * (8 - row) + col + 1
@@ -773,8 +792,9 @@ local function paintQlinkGrid()
 end
 
 local function handleQlinkPad(col, row)
-	local i = qlinkPage * GRID_COLS + col
-	if i >= qlinkCount() or not qlinkAssigned(i) then
+	buildQlinkColumnMap()
+	local i = qlinkForColumn(col)
+	if i == nil then
 		return
 	end
 	local target
@@ -790,7 +810,8 @@ local function handleQlinkPad(col, row)
 end
 
 local function nudgeQlink(delta)
-	local i = qlinkPage * GRID_COLS + qlinkCol
+	buildQlinkColumnMap()
+	local i = qlinkForColumn(qlinkCol)
 	local q = qlinkAt(i)
 	if not q or type(q.Twist) ~= "function" or i >= qlinkCount() then
 		return
@@ -820,7 +841,14 @@ local function enterQlink()
 	qlinkFlip = {}
 	qlinkSeenStrings = {}
 	qlinkSeenPos = {}
-	log("qlink page")
+	buildQlinkColumnMap()
+	local map = {}
+	for c, i in ipairs(qlinkColumnMap) do
+		if c <= GRID_COLS then
+			map[#map + 1] = c .. "=" .. qlinkTargetName(i)
+		end
+	end
+	log("qlink page (" .. #qlinkColumnMap .. " assigned): " .. table.concat(map, ", "))
 	paintAll()
 end
 local function exitQlink()
@@ -1122,7 +1150,7 @@ local function paintLeft()
 	)
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
 	local pageColour = tempoMode and C.white
-		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkPage * GRID_COLS) or adjustColour()))
+		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or adjustColour()))
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -2076,11 +2104,16 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if qlinkMode and (cc == LEFT.up or cc == LEFT.down) then
+		buildQlinkColumnMap()
 		if shift then
 			nudgeQlink(cc == LEFT.up and 1 or -1)
-		else
-			qlinkPage = (qlinkPage == 0) and 1 or 0
-			log("qlink bank " .. (qlinkPage + 1))
+		elseif qlinkPage == 0 and #qlinkColumnMap > GRID_COLS then
+			qlinkPage = 1
+			log("qlink page 2")
+			paintAll()
+		elseif qlinkPage == 1 then
+			qlinkPage = 0
+			log("qlink page 1")
 			paintAll()
 		end
 		return
@@ -2157,7 +2190,8 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			end
 		elseif fn == "device" then
 			if qlinkMode then
-				if qlinkPage == 0 then
+				buildQlinkColumnMap()
+				if qlinkPage == 0 and #qlinkColumnMap > GRID_COLS then
 					qlinkPage = 1
 					log("qlink page 2")
 					paintAll()

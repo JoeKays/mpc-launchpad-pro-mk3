@@ -122,28 +122,52 @@ assert_eq(mock.leds[7][2], 60, "device button available (green)")
 assert_eq(mock.leds[7][3], 60, "device button available (blue)")
 
 L.OnUnload()
--- Unassigned qlinks (empty target name): column dark, presses ignored.
-mock.setQlinkTarget(1, "")
+-- Compaction: only assigned qlinks get columns, packed left with no gaps.
+-- Only qlinks 0, 3, 5, 9 assigned -> page 1 columns are [0, 3, 5, 9], rest dark;
+-- with <= 8 assigned a Device tap exits directly (no empty second page).
+for i = 0, 15 do
+	mock.setQlinkTarget(i, "")
+end
 mock.setQlinkTarget(0, "Kill EQ Low")
-L.HandleMIDICC(0, 7, 127) -- re-enter to repaint
-local savedPos = mock.qlinks[1]:GetPosition()
-L.HandleMIDINoteOn(0, 12, 100) -- column 1 pad
-assert_eq(mock.qlinks[1]:GetPosition(), savedPos, "unassigned qlink untouched")
-assert_eq(mock.leds[12] and mock.leds[12][2] or 0, 0, "unassigned column dark")
-assert_eq(mock.leds[11][2], 127, "assigned column still cyan")
-mock.reset()
-mock.setQlinkTarget(0, "Kill EQ Low")
-mock.setQlinkTarget(1, "")
+mock.setQlinkTarget(3, "Beat Repeat")
+mock.setQlinkTarget(5, "Kill EQ Mid")
+mock.setQlinkTarget(9, "Beat Repeat Delay")
+mock.qlinks[0].SetPosition(127)
+mock.qlinks[3].SetPosition(127)
+mock.qlinks[5].SetPosition(127)
+L.HandleMIDICC(0, 7, 127) -- enter: page 1 (paints the current positions)
+assert_eq(
+	lastLog(),
+	"LaunchpadProMK3: qlink page (4 assigned): 1=Kill EQ Low, 2=Beat Repeat, 3=Kill EQ Mid, 4=Beat Repeat Delay",
+	"page-open map log"
+)
+assert_eq(mock.leds[11][2], 127, "column 1 = qlink 0 cyan")
+assert_eq(mock.leds[12][2], 127, "column 2 = qlink 3 cyan")
+assert_eq(mock.leds[13][1], 127, "column 3 = qlink 5 magenta r")
+assert_eq(mock.leds[13][2], 0, "column 3 = qlink 5 magenta g")
+assert_eq(mock.leds[14][1], 12, "column 4 = qlink 9 dim at position 0")
+assert_eq(mock.leds[15] and mock.leds[15][2] or 0, 0, "column 5 dark (only 4 assigned)")
+assert_eq(mock.leds[18] and mock.leds[18][2] or 0, 0, "column 8 dark")
+L.HandleMIDINoteOn(0, 82, 100) -- column 2 top pad drives qlink 3 to 127
+assert_eq(mock.qlinks[3]:GetPosition(), 127, "compacted column drives the right qlink")
+L.HandleMIDINoteOn(0, 13, 100) -- column 3 bottom pad drives qlink 5 to 16
+assert_eq(mock.qlinks[5]:GetPosition(), 16, "compacted column 3 drives qlink 5")
+L.HandleMIDINoteOn(0, 18, 100) -- column 7 has no qlink: inert
+L.HandleMIDICC(0, 7, 127) -- <= 8 assigned: Device tap exits directly
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "device tap exits when page 2 would be empty")
 
--- Device tap cycles pages: page 1 -> page 2 -> exit.
-L.HandleMIDICC(0, 7, 127) -- guarantee closed first (may already be page 2)
-L.HandleMIDICC(0, 7, 127)
+-- Device tap cycles pages when more than 8 are assigned.
+for i = 0, 15 do
+	mock.setQlinkTarget(i, i % 2 == 0 and "Param " .. i or "")
+end -- assigned: 0,2,4,6,8,10,12,14 (8) + need >8: also 1
+mock.setQlinkTarget(1, "Param 1")
 L.HandleMIDICC(0, 7, 127) -- enter: page 1
-L.HandleMIDICC(0, 7, 127) -- tap again: page 2
+L.HandleMIDICC(0, 7, 127) -- tap again: page 2 (9 assigned)
 assert_eq(lastLog(), "LaunchpadProMK3: qlink page 2", "device tap switches to page 2")
 assert_eq(mock.leds[7][1], 127, "device button still white on page 2")
 L.HandleMIDICC(0, 7, 127) -- tap again: exit
 assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "third tap exits")
+mock.reset()
 
 -- Re-enter page 1 for colour + flip tests.
 L.HandleMIDICC(0, 7, 127)
