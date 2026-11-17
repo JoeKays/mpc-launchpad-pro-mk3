@@ -705,13 +705,50 @@ local function doTransport(fn)
 	end
 end
 
+-- Press a virtual Force button (Press then Release). Returns true on success, or false plus
+-- the name of the missing API. mpc.force is firmware-specific and may be absent or a no-op
+-- on non-Force hardware, so every call is guarded.
+local function pressForce(name)
+	local b = mpc.force and mpc.force[name]
+	if not b then
+		return false, "mpc.force." .. name
+	end
+	if type(b.Press) ~= "function" then
+		return false, "mpc.force." .. name .. ".Press"
+	end
+	if type(b.Release) ~= "function" then
+		return false, "mpc.force." .. name .. ".Release"
+	end
+	local okPress, errPress = pcall(b.Press)
+	if not okPress then
+		logOnce("force." .. name .. ".Press", "force." .. name .. ".Press failed: " .. tostring(errPress))
+	end
+	local okRelease, errRelease = pcall(b.Release)
+	if not okRelease then
+		logOnce("force." .. name .. ".Release", "force." .. name .. ".Release failed: " .. tostring(errRelease))
+	end
+	return true
+end
+
+-- Left-column edit buttons act on MPC's current selection. The 3.10.1 contract has no
+-- clip-level duplicate/clear call, so use the virtual Force COPY/DELETE buttons.
 local function doEdit(fn)
 	if fn == "quantize" then
-		log("quantize: TODO")
+		log("quantize: TODO (no clip-quantize API in the 3.10.1 contract)")
 	elseif fn == "duplicate" then
-		log("duplicate: TODO")
+		local ok, missing = pressForce("copy")
+		if ok then
+			log("duplicate: force.copy Press/Release")
+		else
+			log("duplicate: TODO (" .. missing .. " unavailable)")
+		end
 	elseif fn == "clear" then
-		log("clear: TODO")
+		local ok, missing = pressForce("delete")
+		if ok then
+			log("clear: force.delete Press/Release")
+		else
+			log("clear: TODO (" .. missing .. " unavailable)")
+		end
 	end
 end
 

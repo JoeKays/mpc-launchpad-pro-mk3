@@ -74,11 +74,18 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 10 | record/capture midi | `sequencer.Record` |
 | 20 | play | `IsPlaying` ? `Stop` : `Play` |
 | 30 | fixed length | stub |
-| 40 | quantize/record quantize | stub |
-| 50 | duplicate/double | stub |
-| 60 | clear | stub |
+| 40 | quantize/record quantize | stub (no clip-quantize API in the 3.10.1 contract) |
+| 50 | duplicate/double | `mpc.force.copy.Press()`/`Release()` on the selected clip; TODO if unavailable |
+| 60 | clear | `mpc.force.delete.Press()`/`Release()` on the selected clip; TODO if unavailable |
 | 70 | down | window down (`MoveDown`); Shift = 8 |
 | 80 | up | window up (`MoveUp`); Shift = 8 |
+
+CC 50/60 use the virtual Force COPY/DELETE buttons (`mpc.force.copy`/`mpc.force.delete`),
+which act on MPC's current selection. The 3.10.1 contract has no clip-level duplicate/clear
+call. If `mpc.force` is absent (or the button lacks `Press`/`Release`), the script logs a
+TODO naming the missing API and does nothing. On non-Force hardware the buttons may be
+no-ops. The script only presses the buttons; the copy/paste and delete semantics are MPC's
+own.
 
 ## LED feedback
 

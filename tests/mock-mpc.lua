@@ -71,6 +71,15 @@ local commandManager = {
   Redo = function() record("Redo") end,
 }
 
+-- virtual Force buttons (mpc.force.<name>.Press/Release)
+local force = {}
+for _, name in ipairs({ "copy", "delete" }) do
+  force[name] = {
+    Press = function() record("force." .. name .. ".Press") end,
+    Release = function() record("force." .. name .. ".Release") end,
+  }
+end
+
 -- aperture + clip properties
 local clipProperties = {}
 for c = 0, 7 do
@@ -158,6 +167,7 @@ local mpc = {
   tracks = { normalTracks = tracks, currentTrack = { Index = prop(0) } },
   sequencer = sequencer,
   commandManager = commandManager,
+  force = force,
   controlSurface = { pads = { Tap = function() end, Press = function() end, Release = function() end } },
   ui = { ShowTUIFeedback = function(s) record("ShowTUIFeedback", s) end },
   engineMode = { CurrentMode = prop("clip") },
@@ -178,6 +188,7 @@ M.clipProperties = clipProperties
 M.tracks = tracks
 M.sequencer = sequencer
 M.commandManager = commandManager
+M.force = force
 M.midiOut = midiOut
 M.timer = timer
 
