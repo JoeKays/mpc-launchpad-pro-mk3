@@ -204,7 +204,9 @@ normal clip grid is repainted.
 Tapping the Note button iterates: clip grid -> **drum** -> **chromatic** -> clip grid
 (CC 93 session also exits at any point):
 
-- **drum** (default): pad 0-15 maps to the bottom-left 4x4 quadrant (`col = pad % 4`,
+- **drum** (default): entering presses the MPC's Main screen button
+  (`controlSurface.main`) first so its pad grid lights (the MPC reports black pads on
+  non-pad screens). Pad 0-15 maps to the bottom-left 4x4 quadrant (`col = pad % 4`,
   `padRow = pad // 4`, `note = 10*(padRow+1)+col+1`, so pad 0 = note 11). Each note is
   unbound from the script and bound with `mappings.pads.AddNoteToMpcPad` (bank A only,
   device-verified), so the pads play the MPC's own pad bank; the quadrant mirrors the

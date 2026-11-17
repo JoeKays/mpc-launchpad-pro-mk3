@@ -1546,6 +1546,17 @@ local function enterPadsMode()
 	padsMode = true
 	padsColourCache = {}
 	boundPadNotes = {}
+	if padsLayout == "drum" then
+		-- The MPC only lights its pad grid on pad-capable screens (Main, program
+		-- editors); on other pages (Keyboard settings, Q-Link, step seq, browser) the
+		-- pads report black and the mirror would go dark. Return the MPC to its Main
+		-- screen so the grid lights up (guarded; logged once if unavailable).
+		if pressSurfaceButton("main") then
+			log("pad view: main screen")
+		else
+			logOnce("padview", "pad view reset unavailable: controlSurface.main missing")
+		end
+	end
 	if padsLayout == "chromatic" then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
