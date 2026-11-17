@@ -254,6 +254,16 @@ local function adjustPropName()
 	return nil
 end
 
+-- Page colour for the active fader menu (also used by the up/down arrows).
+local function adjustColour()
+	if adjustMode == "pan" then
+		return C.magenta
+	elseif adjustMode == "sends" then
+		return SEND_COLOURS[adjustSend] or C.yellow
+	end
+	return C.cyan
+end
+
 local function argb(c)
 	c = tonumber(c) or 0
 	return math.floor(c / 65536) % 256, math.floor(c / 256) % 256, c % 256
@@ -608,32 +618,21 @@ local function paintLeft()
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
 	ledOff(LEFT.fixedLength)
 	ledOff(LEFT.quantize)
-	local dupOn = clipOp == "duplicate"
-	local clearOn = clipOp == "clear"
 	local nudgeOn = adjustMode ~= nil
-	ledRGB(
-		LEFT.duplicate,
-		dupOn and C.white[1] or C.white[1],
-		dupOn and C.white[2] or C.white[2],
-		dupOn and C.white[3] or C.white[3]
-	)
-	ledRGB(
-		LEFT.clear,
-		clearOn and C.white[1] or C.white[1],
-		clearOn and C.white[2] or C.white[2],
-		clearOn and C.white[3] or C.white[3]
-	)
+	local pageColour = adjustColour()
+	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
+	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
 		LEFT.down,
-		nudgeOn and C.cyan[1] or C.white[1],
-		nudgeOn and C.cyan[2] or C.white[2],
-		nudgeOn and C.cyan[3] or C.white[3]
+		nudgeOn and pageColour[1] or C.white[1],
+		nudgeOn and pageColour[2] or C.white[2],
+		nudgeOn and pageColour[3] or C.white[3]
 	)
 	ledRGB(
 		LEFT.up,
-		nudgeOn and C.cyan[1] or C.white[1],
-		nudgeOn and C.cyan[2] or C.white[2],
-		nudgeOn and C.cyan[3] or C.white[3]
+		nudgeOn and pageColour[1] or C.white[1],
+		nudgeOn and pageColour[2] or C.white[2],
+		nudgeOn and pageColour[3] or C.white[3]
 	)
 end
 

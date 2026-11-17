@@ -69,6 +69,11 @@ assert_near(mock.tracks[0].Volume.value, db_gain(6), "volume clamped at +6 dB")
 
 -- Pan menu: press CC 5.
 L.HandleMIDICC(0, 5, 127)
+-- Up/down take the pan page colour (magenta).
+assert_eq(mock.leds[80][1], 127, "pan up red")
+assert_eq(mock.leds[80][2], 0, "pan up green")
+assert_eq(mock.leds[80][3], 127, "pan up blue")
+assert_eq(mock.leds[70][1], 127, "pan down red")
 -- Grid pad col 1, row 4 (note 42) -> track 1 pan 4/8 = 0.5.
 L.HandleMIDINoteOn(0, 42, 100)
 assert_near(mock.tracks[1].Pan.value, 4 / 8, "pan row 4 = 0.5")
@@ -84,6 +89,10 @@ assert_near(mock.tracks[1].Pan.value, 0.0, "pan double-tap bottom = 0.0")
 
 -- Sends menu: press CC 6.
 L.HandleMIDICC(0, 6, 127)
+-- Up/down take the send page colour (send 1 = yellow).
+assert_eq(mock.leds[80][1], 127, "send up red")
+assert_eq(mock.leds[80][2], 127, "send up green")
+assert_eq(mock.leds[80][3], 0, "send up blue")
 -- Grid pad col 2, top row (note 83) -> track 2 send 1 = 1.0.
 L.HandleMIDINoteOn(0, 83, 100)
 assert_near(mock.tracks[2].Send1.value, 1.0, "send 1 = 1.0")

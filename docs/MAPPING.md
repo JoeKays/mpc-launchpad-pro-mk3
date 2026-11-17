@@ -155,7 +155,7 @@ working.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
 - Function buttons (CC 1-8): three states — off when the function is unavailable (e.g. device), a lighter grey when available, white when held/selected.
 - Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording; duplicate/clear white while available; up/down white while available and cyan while a fader menu is open. Fixed length and quantize are stubs and stay off.
+- Left column: play green while playing, record red while recording; duplicate/clear white while available; up/down white while available and take the page colour while a fader menu is open (cyan volume, magenta pan, send colour). Fixed length and quantize are stubs and stay off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),
