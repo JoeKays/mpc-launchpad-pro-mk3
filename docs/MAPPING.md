@@ -203,8 +203,8 @@ normal clip grid is repainted.
 
 Tapping the Note button toggles the pads mode, and the track's `Type` fixes which
 layout you get: pad-based Drum programs toggle clip grid <-> **drum**, melodic
-Plugin/Keygroup/MIDI tracks toggle clip grid <-> **chromatic** (the journal logs
-`track type Plugin -> chromatic`). The unsuitable layout is never offered — chromatic
+Plugin/Keygroup/MIDI tracks toggle clip grid <-> **pads64** (the journal logs
+`track type Plugin -> pads64`). The unsuitable layout is never offered — chromatic
 is silent on drum programs and the drum grid is meaningless on a synth track. CC 93
 (session) also exits at any point.
 
@@ -215,13 +215,15 @@ is silent on drum programs and the drum grid is meaningless on a synth track. CC
   unbound from the script and bound with `mappings.pads.AddNoteToMpcPad` (bank A only,
   device-verified), so the pads play the MPC's own pad bank; the quadrant mirrors the
   MPC pad colours.
-- **chromatic**: the whole 8x8 grid plays chromatic notes in perfect 4ths (each row
-  +5 semitones) through `mappings.pads.AddNoteToVirtualPad` — virtual pads are the
-  MPC's note-addressed pad input; virtual pad N sounds as MIDI note 36+N, so the pad
-  index is the target note minus 36 (base 48 = C3). Leaving the chromatic layout presses the MPC's
-  bank-1 button (`controlSurface.bank1`): virtual pads sit beyond the physical 16 and
-  can otherwise leave the pad engine on an out-of-range bank where every track's pads
-  are dark and silent (MIDI still registers). The base note (default 48) shifts an octave with
+- **pads64**: the whole 8x8 grid maps 1:1 to the program's 64 pads, matching MPC
+  3.10.1's native "8x8: 64 Pads Mode" — row-major, each grid row is one pad bank
+  (bottom row = bank A, eight banks A-H of eight pads), driven through
+  `mappings.pads.AddNoteToVirtualPad` (virtual pad N = program pad N+1). LEDs: dim
+  blue grid with the bank A row mirroring the MPC's own pad colours when available.
+  Leaving the layout presses the MPC's bank-1 button (`controlSurface.bank1`):
+  virtual pads sit beyond the physical 16 and can otherwise leave the pad engine on
+  an out-of-range bank where every track's pads are dark and silent (MIDI still
+  registers). The base note (default 48) shifts an octave with
   up/down (CC 80/70) while the mode is open. LEDs: blue note grid, C notes full blue
   and the rest a dim blue tint.
   The note button shows cyan in this layout (white in drum).

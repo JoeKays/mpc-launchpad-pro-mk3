@@ -158,8 +158,7 @@ local followMode = false -- optional grid-follows-current-track; Shift+CC 93 tog
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local padUtility = "off" -- CC 95 cycles the MPC's pad utilities: note repeat -> full level -> off
-local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or chromatic (virtual pads)
-local padsBaseNote = 48 -- chromatic layout root note (up/down arrows shift it by an octave)
+local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or pads64 (all four banks)
 local boundPadNotes = {} -- grid notes currently routed away from the script
 local chromaticVirtualPad -- forward declaration (defined with the pad-mode helpers)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
@@ -938,24 +937,34 @@ end
 -- Pads mode grid: the bottom-left 4x4 quadrant mirrors mpc.controlSurface.pads[i].Colour
 -- (ARGB int, alpha ignored); the rest of the grid is dark. poll=true re-reads the pad
 -- colours; padsColourCache keeps the last ARGB per pad so only diffs are sent.
--- Chromatic layout LEDs: blue note grid, C notes full blue and the rest a dim blue
--- tint, so the octave shape is visible without any white (no MPC pad colours exist
--- for virtual pads).
+-- 64-pads layout LEDs: dim blue grid; the bank A row (bottom) mirrors the MPC's own
+-- pad colours when available (controlSurface.pads covers the 16 physical pads).
 local function paintChromaticGrid()
 	for padRow = 0, 7 do
 		for col = 0, 7 do
 			local idx = 10 * (padRow + 1) + col + 1
-			if chromaticVirtualPad(padRow, col) % 12 == 0 then
-				ledRGB(idx, C.blue[1], C.blue[2], C.blue[3])
-			else
-				ledRGB(idx, 0, 15, 30)
-			end
+			ledRGB(idx, 0, 15, 30)
+		end
+	end
+	local cs = mpc.controlSurface
+	local pads = cs and cs.pads
+	for i = 0, 15 do
+		local col = i % 8
+		local idx = 10 + col + 1
+		local p = pads and pads[i]
+		local v = call(p and p.GetColour)
+		if type(v) ~= "number" then
+			v = propValue(p, "Colour")
+		end
+		if type(v) == "number" and v ~= 0 and v ~= -16777216 then
+			local r, g, b = argb(v)
+			ledRGB(idx, scale7(r), scale7(g), scale7(b))
 		end
 	end
 end
 
 local function paintPadsGrid(poll)
-	if padsLayout == "chromatic" then
+	if padsLayout == "pads64" then
 		paintChromaticGrid()
 		return
 	end
@@ -1154,7 +1163,7 @@ local function paintTop()
 	local sequencer = modeColour("step")
 	local note = C.off
 	if padsMode then
-		note = (padsLayout == "chromatic") and C.cyan or C.white
+		note = (padsLayout == "pads64") and C.cyan or C.white
 	elseif padsLayoutAvailable() then
 		note = C.available
 	end
@@ -1459,7 +1468,7 @@ padsLayoutAvailable = function()
 	if not pads then
 		return false
 	end
-	if padsLayout == "chromatic" then
+	if padsLayout == "pads64" then
 		return type(pads.AddNoteToVirtualPad) == "function"
 	end
 	return type(pads.AddNoteToMpcPad) == "function"
@@ -1515,7 +1524,7 @@ local function exitPadsMode()
 	end
 	boundPadNotes = {}
 	padsColourCache = {}
-	if padsLayout == "chromatic" then
+	if padsLayout == "pads64" then
 		-- virtual pads live beyond the physical 16; using them can leave the MPC's pad
 		-- engine on an out-of-range bank where every track's pads are dark and silent
 		-- (they still show MIDI activity). Return the pad bank to A on the way out.
@@ -1534,13 +1543,12 @@ end
 -- through virtual pads (AddNoteToVirtualPad) because AddNoteToMpcPad only reaches
 -- bank A (16 pads, device-verified). The root note shifts by octaves with the
 -- up/down arrows while the mode is open.
--- Virtual pad N sounds as MIDI note 36+N (pad 1 = note 36, the MPC pad-note map),
--- so the pad index for a sounding note is note - 36; the base note is a real MIDI
--- note (default 48 = C3). Device-verified: the old direct mapping sounded an octave
--- and a half too high.
+-- 64-pads layout (MPC 3.10.1 "8x8: 64 Pads Mode"): the grid maps 1:1 to the
+-- program's 64 pads, row-major — each grid row is one pad bank (bottom row = bank A,
+-- eight banks A-H of eight pads). Virtual pad N is program pad N+1, so virtual pads
+-- 0-63 cover the whole program.
 chromaticVirtualPad = function(padRow, col)
-	local note = padsBaseNote + padRow * 5 + col
-	return note - 36
+	return padRow * 8 + col
 end
 
 local function enterPadsMode()
@@ -1550,7 +1558,7 @@ local function enterPadsMode()
 		logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
 		return
 	end
-	if padsLayout == "chromatic" and type(pads.AddNoteToVirtualPad) ~= "function" then
+	if padsLayout == "pads64" and type(pads.AddNoteToVirtualPad) ~= "function" then
 		logOnce("padschromatic", "chromatic layout unavailable: AddNoteToVirtualPad missing")
 		return
 	end
@@ -1572,7 +1580,7 @@ local function enterPadsMode()
 			logOnce("padview", "pad view reset unavailable: controlSurface.main missing")
 		end
 	end
-	if padsLayout == "chromatic" then
+	if padsLayout == "pads64" then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
 				local note = 10 * (padRow + 1) + col + 1
@@ -1589,7 +1597,7 @@ local function enterPadsMode()
 			boundPadNotes[#boundPadNotes + 1] = { note = note, pad = i }
 		end
 	end
-	log("pads mode on (" .. padsLayout .. ", base " .. (padsLayout == "chromatic" and padsBaseNote or "drum") .. ")")
+	log("pads mode on (" .. padsLayout .. ")")
 end
 
 -- Pick the first layout from the current track's Type: pad-based programs (Drum)
@@ -1598,7 +1606,7 @@ local function firstLayoutForTrack()
 	local t = mpc.tracks and mpc.tracks.currentTrack
 	local trackType = propValue(t, "Type")
 	if type(trackType) == "string" and trackType ~= "" and trackType ~= "Drum" then
-		return "chromatic", trackType
+		return "pads64", trackType
 	end
 	return "drum", trackType
 end
@@ -2286,15 +2294,6 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		paintAll()
 		return
 	end
-	if padsMode and padsLayout == "chromatic" and (cc == LEFT.up or cc == LEFT.down) then
-		local delta = (cc == LEFT.up) and 12 or -12
-		padsBaseNote = math.max(24, math.min(96, padsBaseNote + delta))
-		exitPadsMode()
-		enterPadsMode()
-		paintAll()
-		log("chromatic base " .. padsBaseNote)
-		return
-	end
 	if cc == TOP.custom then
 		logOnce("custom", "custom mode: TODO (mutes live on the CC 2 hold-function)")
 		return
@@ -2573,7 +2572,6 @@ function LaunchpadProMK3.OnLoad()
 	followMode = false
 	padsMode = false
 	padsLayout = "drum"
-	padsBaseNote = 48
 	padUtility = "off"
 	padsColourCache = {}
 	clipOp = nil

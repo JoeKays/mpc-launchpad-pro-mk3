@@ -172,36 +172,34 @@ assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
 
--- Melodic tracks toggle chromatic <-> clip grid (2-state).
+-- Melodic tracks toggle 64-pads <-> clip grid (2-state, row-major banks A-H).
 mock.reset()
 mock.mpc.tracks.currentTrack.Type.value = "Plugin"
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("AddNoteToMpcPad"), 0, "no drum binding on a plugin track")
 assert_eq(mock.count("AddNoteToVirtualPad"), 64, "64 virtual pads bound")
-local first = mock.find("AddNoteToVirtualPad")[1]
-assert_eq(first.args[3], 12, "bottom-left virtual pad = base 48 - 36")
-assert_eq(mock.find("AddNoteToVirtualPad")[9].args[3], 17, "row above starts a 4th higher")
-assert_eq(mock.leds[94][2], 127, "note button cyan in chromatic layout")
+local all = mock.find("AddNoteToVirtualPad")
+assert_eq(all[1].args[3], 0, "bottom-left = pad 1 (bank A)")
+assert_eq(all[8].args[3], 7, "bottom-right = pad 8 (bank A)")
+assert_eq(all[9].args[3], 8, "second row starts bank B")
+assert_eq(all[64].args[3], 63, "top-right = pad 64 (bank H)")
+assert_eq(mock.leds[94][2], 127, "note button cyan in the 64-pads layout")
 assert_eq(mock.leds[94][1], 0, "note button cyan r")
-assert_eq(mock.leds[11][2], 60, "C note full blue g")
-assert_eq(mock.leds[11][1], 0, "C note blue r")
-assert_eq(mock.leds[12][3], 30, "non-C note dim blue tint b")
--- octave up: rebinds one octave higher (the latest 64 bindings)
-local function latestVirtual()
-	local all = mock.find("AddNoteToVirtualPad")
-	return all[#all - 63]
-end
-L.HandleMIDICC(0, 80, 127)
-assert_eq(latestVirtual().args[3], 24, "base shifted +12 (60 - 36)")
-L.HandleMIDICC(0, 70, 127)
-assert_eq(latestVirtual().args[3], 12, "base shifted back (48 - 36)")
+
+-- bank A row mirrors the MPC pad colours when set (timer refresh paints the grid)
+mock.mpc.controlSurface.pads[0].Colour.value = 0x00FF0000
+L.HandleTimer()
+L.HandleTimer()
+assert_eq(mock.leds[12][3], 30, "grid dim blue tint after repaint")
+assert_eq(mock.leds[11][1], 127, "bank A pad 1 colour mirrored r")
+assert_eq(mock.leds[11][2], 0, "bank A pad 1 colour mirrored g")
 -- exit: single tap, restores all notes and resets the MPC pad bank
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("RemoveNoteToVirtualPad"), 64, "exit unbinds the virtual pads")
 assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
-assert_eq(mock.count("bank1.Press"), 1, "leaving chromatic resets the pad bank")
-assert_eq(mock.count("AddNoteToMpcPad"), 0, "chromatic exit never binds drums")
+assert_eq(mock.count("bank1.Press"), 1, "leaving 64-pads resets the pad bank")
+assert_eq(mock.count("AddNoteToMpcPad"), 0, "64-pads exit never binds drums")
 mock.mpc.tracks.currentTrack.Type.value = "Drum"
 
 print("test-pad-modes: PASS")

@@ -65,8 +65,9 @@ track navigation, plugin presets and the firmware probe are implemented and host
   the tempo page.
 - **MPC pads mode**: tapping CC 94 toggles a playing mode chosen from the track type —
   drum tracks get the drum layout (bottom-left 4x4 = MPC pad bank A, colours
-  mirrored), melodic tracks get chromatic (full grid in perfect 4ths via virtual
-  pads, octave shifted by up/down, C notes marked); CC 93 also exits at any point.
+  mirrored), melodic tracks get the 64-pads layout (full 8x8 grid = the program's 64
+  pads, row-major banks A-H, matching MPC 3.10.1's native 8x8 64 Pads mode); CC 93
+  also exits at any point.
 - **Modes**: 93 session = clip (Shift = toggle follow), 94 note = MPC pads mode,
   95 chord = cycles the MPC's keyboard/chord pad modes inside pads mode, 96 custom =
   stub, 97 sequencer = opens the MPC step seq view (Shift = next bar); Shift + 98 =
