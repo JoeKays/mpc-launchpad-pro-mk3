@@ -154,6 +154,7 @@ local swingHoldTicks = 0 -- ticks since the swing button was pressed
 local qlinkMode = false -- CC7 device page: Q-Link faders (Twist-driven)
 local qlinkPage = 0 -- 0 = Q-Links 0-7, 1 = Q-Links 8-15
 local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
+local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
@@ -997,7 +998,8 @@ local function paintTop()
 			return C.dim
 		end
 	end
-	local session = modeColour("clip")
+	-- session shows cyan while grid-follow is enabled so the toggle state is visible
+	local session = followMode and C.cyan or modeColour("clip")
 	local sequencer = modeColour("step")
 	local note = padsMode and C.white or (padsModeAvailable() and C.available or C.off)
 	local chord = modeColour("chord")
@@ -1155,8 +1157,6 @@ end
 -- (Master matrix for the master track), then rebind the slot listeners for the
 -- new window and repaint. The track row (CC 101-108) selects MPC's current
 -- track, so the grid follows track selection too.
-local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
-
 local function followCurrentTrack(index)
 	if followMode and aperture and type(index) == "number" then
 		local normalCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
@@ -1932,6 +1932,9 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			log("follow: " .. (followMode and "on" or "off"))
 			if followMode then
 				followCurrentTrack(propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
+			else
+				paintTop()
+				flushLEDs()
 			end
 			return
 		end

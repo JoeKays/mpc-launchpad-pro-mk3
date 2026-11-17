@@ -194,8 +194,11 @@ end
 L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 93, 127)
 assert_eq(logHas("follow: on") and true or false, true, "follow toggle on")
+assert_eq(mock.leds[93][3], 127, "session button cyan while follow is on")
+assert_eq(mock.leds[93][1], 0, "session button cyan r while follow is on")
 L.HandleMIDICC(0, 93, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: follow: off", "follow toggle off")
+assert_eq(mock.leds[93][1], 127, "session button white again after follow off")
 L.HandleMIDICC(0, 90, 0)
 
 local savedLoop = mock.mpc.sequencer.Loop
