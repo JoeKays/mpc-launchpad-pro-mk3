@@ -415,45 +415,95 @@ end
 -- Painting
 -----------------------------------------------------------------------------------------------
 
--- 2x5 digit font for the tempo page. Each digit is two columns wide and five
--- rows tall; three digits plus two one-column gaps fill the 8-column grid.
-local DIGIT_FONT = {
-	["0"] = { "11", "10", "10", "10", "11" },
-	["1"] = { "01", "01", "01", "01", "01" },
-	["2"] = { "11", "01", "11", "10", "11" },
-	["3"] = { "11", "01", "11", "01", "11" },
-	["4"] = { "10", "10", "11", "01", "01" },
-	["5"] = { "11", "10", "11", "01", "11" },
-	["6"] = { "11", "10", "11", "10", "11" },
-	["7"] = { "11", "01", "01", "01", "01" },
-	["8"] = { "11", "11", "11", "11", "11" },
-	["9"] = { "11", "10", "11", "01", "11" },
+-- Tempo page: a 7-segment display scaled to the grid. A 3-digit BPM uses
+-- 2-column digits with 1-column gaps; a 2-digit BPM uses 4-column digits with
+-- no gaps, so the number is as large as the grid allows.
+local SEGMENTS = {
+	["0"] = { a = true, b = true, c = true, d = true, e = true, f = true, g = false },
+	["1"] = { a = false, b = true, c = true, d = false, e = false, f = false, g = false },
+	["2"] = { a = true, b = true, c = false, d = true, e = true, f = false, g = true },
+	["3"] = { a = true, b = true, c = true, d = true, e = false, f = false, g = true },
+	["4"] = { a = false, b = true, c = true, d = false, e = false, f = true, g = true },
+	["5"] = { a = true, b = false, c = true, d = true, e = false, f = true, g = true },
+	["6"] = { a = true, b = false, c = true, d = true, e = true, f = true, g = true },
+	["7"] = { a = true, b = true, c = true, d = false, e = false, f = false, g = false },
+	["8"] = { a = true, b = true, c = true, d = true, e = true, f = true, g = true },
+	["9"] = { a = true, b = true, c = true, d = true, e = false, f = true, g = true },
 }
+
+local function tempoPad(col, row)
+	if col >= 0 and col < GRID_COLS and row >= 0 and row < GRID_ROWS then
+		ledRGB(10 * (8 - row) + col + 1, C.white[1], C.white[2], C.white[3])
+	end
+end
+
+-- Draw one 7-segment digit in the box (x0, y0) .. (x0+w-1, y0+h-1).
+local function drawDigit(ch, x0, y0, w, h)
+	local seg = SEGMENTS[ch]
+	if not seg then
+		return
+	end
+	local mid = math.floor(h / 2)
+	if seg.a then
+		for c = 0, w - 1 do
+			tempoPad(x0 + c, y0)
+		end
+	end
+	if seg.d then
+		for c = 0, w - 1 do
+			tempoPad(x0 + c, y0 + h - 1)
+		end
+	end
+	if seg.g then
+		for c = 0, w - 1 do
+			tempoPad(x0 + c, y0 + mid)
+		end
+	end
+	if seg.f then
+		for r = 0, mid do
+			tempoPad(x0, y0 + r)
+		end
+	end
+	if seg.b then
+		for r = 0, mid do
+			tempoPad(x0 + w - 1, y0 + r)
+		end
+	end
+	if seg.e then
+		for r = mid, h - 1 do
+			tempoPad(x0, y0 + r)
+		end
+	end
+	if seg.c then
+		for r = mid, h - 1 do
+			tempoPad(x0 + w - 1, y0 + r)
+		end
+	end
+end
 
 local function paintTempoGrid()
 	local bpm = math.floor(call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
 	bpm = math.max(0, math.min(999, bpm))
-	local text = string.format("%3d", bpm)
-	-- clear the whole grid first; the digits only occupy rows 2..6
 	for row = 0, GRID_ROWS - 1 do
 		for col = 0, GRID_COLS - 1 do
 			ledOff(10 * (8 - row) + col + 1)
 		end
 	end
-	for i = 1, 3 do
-		local pattern = DIGIT_FONT[text:sub(i, i)]
-		local baseCol = (i - 1) * 3
-		for r = 1, 5 do
-			local padRow = 7 - r -- rows 2..6, centred vertically
-			for c = 1, 2 do
-				local idx = 10 * (8 - padRow) + (baseCol + c - 1) + 1
-				if pattern and pattern[r]:sub(c, c) == "1" then
-					ledRGB(idx, C.white[1], C.white[2], C.white[3])
-				else
-					ledOff(idx)
-				end
-			end
-		end
+	local text, digitW, gap
+	if bpm >= 100 then
+		text = string.format("%3d", bpm)
+		digitW = 2
+		gap = 1
+	else
+		text = string.format("%2d", bpm)
+		digitW = 4
+		gap = 0
+	end
+	local n = #text
+	local totalW = n * digitW + (n - 1) * gap
+	local x0 = math.floor((GRID_COLS - totalW) / 2)
+	for i = 1, n do
+		drawDigit(text:sub(i, i), x0 + (i - 1) * (digitW + gap), 0, digitW, GRID_ROWS)
 	end
 end
 
