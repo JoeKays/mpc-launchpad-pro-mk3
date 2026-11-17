@@ -757,20 +757,18 @@ local QLINK_PAGE_GROUPS = {
 }
 local qlinkColumnMap = {}
 
--- Fixed bank groups: columns 1-4 always belong to the MPC's page 1 (12,8,4,0), columns
--- 5-8 to its page 2 (13,9,5,1) — an unassigned slot only ever leaves a gap at the END
--- of its group, so faders never slide across a bank boundary and the grouping on the
--- grid matches the MPC screen exactly.
+-- Fixed slot positions: columns 1-4 are ALWAYS the MPC's page 1 slots (12,8,4,0) and
+-- columns 5-8 its page 2 slots (13,9,5,1), one column per slot — no compaction, no
+-- sliding. An unassigned slot keeps its column as a dark gap exactly where the MPC
+-- screen shows it (device-verified: the user's page 1 reads unmapped, High, Mid, Low).
 local function buildQlinkColumnMap(page)
 	qlinkColumnMap = {}
 	local count = qlinkCount()
 	local groups = QLINK_PAGE_GROUPS[page or qlinkPage] or QLINK_PAGE_GROUPS[0]
 	for g = 1, 2 do
-		local col = 4 * (g - 1)
-		for _, i in ipairs(groups[g]) do
+		for rank, i in ipairs(groups[g]) do
 			if i < count and qlinkAssigned(i) then
-				qlinkColumnMap[col] = i
-				col = col + 1
+				qlinkColumnMap[4 * (g - 1) + rank - 1] = i
 			end
 		end
 	end
