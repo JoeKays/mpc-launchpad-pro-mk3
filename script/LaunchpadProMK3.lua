@@ -937,28 +937,28 @@ end
 -- Pads mode grid: the bottom-left 4x4 quadrant mirrors mpc.controlSurface.pads[i].Colour
 -- (ARGB int, alpha ignored); the rest of the grid is dark. poll=true re-reads the pad
 -- colours; padsColourCache keeps the last ARGB per pad so only diffs are sent.
--- 64-pads layout LEDs: dim blue grid; the bank A row (bottom) mirrors the MPC's own
--- pad colours when available (controlSurface.pads covers the 16 physical pads).
+-- 64-pads layout LEDs: every pad mirrors its MPC colour from controlSurface.pads.virtual
+-- (128 virtual pads; they read 0 until a program is loaded). Pads with no colour keep
+-- a dim blue tint so the grid shape stays visible.
 local function paintChromaticGrid()
+	local cs = mpc.controlSurface
+	local pads = cs and cs.pads
+	local virt = pads and pads.virtual
 	for padRow = 0, 7 do
 		for col = 0, 7 do
 			local idx = 10 * (padRow + 1) + col + 1
-			ledRGB(idx, 0, 15, 30)
-		end
-	end
-	local cs = mpc.controlSurface
-	local pads = cs and cs.pads
-	for i = 0, 15 do
-		local col = i % 8
-		local idx = 10 + col + 1
-		local p = pads and pads[i]
-		local v = call(p and p.GetColour)
-		if type(v) ~= "number" then
-			v = propValue(p, "Colour")
-		end
-		if type(v) == "number" and v ~= 0 and v ~= -16777216 then
-			local r, g, b = argb(v)
-			ledRGB(idx, scale7(r), scale7(g), scale7(b))
+			local i = padRow * 8 + col
+			local p = (virt and virt[i]) or (pads and pads[i])
+			local v = call(p and p.GetColour)
+			if type(v) ~= "number" then
+				v = propValue(p, "Colour")
+			end
+			if type(v) == "number" and v ~= 0 and v ~= -16777216 then
+				local r, g, b = argb(v)
+				ledRGB(idx, scale7(r), scale7(g), scale7(b))
+			else
+				ledRGB(idx, 0, 15, 30)
+			end
 		end
 	end
 end
@@ -2671,7 +2671,6 @@ function LaunchpadProMK3.OnLoad()
 	call(dev.timer and dev.timer.Start, 50)
 	log("loaded")
 end
-
 function LaunchpadProMK3.OnUnload()
 	call(dev.timer and dev.timer.Stop)
 	removeListeners()

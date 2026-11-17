@@ -218,8 +218,9 @@ is silent on drum programs and the drum grid is meaningless on a synth track. CC
 - **pads64**: the whole 8x8 grid maps 1:1 to the program's 64 pads, matching MPC
   3.10.1's native "8x8: 64 Pads Mode" — row-major, each grid row is one pad bank
   (bottom row = bank A, eight banks A-H of eight pads), driven through
-  `mappings.pads.AddNoteToVirtualPad` (virtual pad N = program pad N+1). LEDs: dim
-  blue grid with the bank A row mirroring the MPC's own pad colours when available.
+  `mappings.pads.AddNoteToVirtualPad` (virtual pad N = program pad N+1). LEDs: every pad
+  mirrors its MPC colour from `controlSurface.pads.virtual[i]` (the 128 virtual pads;
+  colours populate once a program is loaded); uncoloured pads keep a dim blue tint.
   Leaving the layout presses the MPC's bank-1 button (`controlSurface.bank1`):
   virtual pads sit beyond the physical 16 and can otherwise leave the pad engine on
   an out-of-range bank where every track's pads are dark and silent (MIDI still

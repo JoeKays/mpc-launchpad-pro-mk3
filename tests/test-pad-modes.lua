@@ -186,13 +186,15 @@ assert_eq(all[64].args[3], 63, "top-right = pad 64 (bank H)")
 assert_eq(mock.leds[94][2], 127, "note button cyan in the 64-pads layout")
 assert_eq(mock.leds[94][1], 0, "note button cyan r")
 
--- bank A row mirrors the MPC pad colours when set (timer refresh paints the grid)
-mock.mpc.controlSurface.pads[0].Colour.value = 0x00FF0000
+-- virtual pad colours light the whole grid (timer refresh paints)
+mock.mpc.controlSurface.pads.virtual[0].Colour.value = 0x00FF0000
+mock.mpc.controlSurface.pads.virtual[40].Colour.value = 0x0000FF00
 L.HandleTimer()
 L.HandleTimer()
-assert_eq(mock.leds[12][3], 30, "grid dim blue tint after repaint")
-assert_eq(mock.leds[11][1], 127, "bank A pad 1 colour mirrored r")
-assert_eq(mock.leds[11][2], 0, "bank A pad 1 colour mirrored g")
+assert_eq(mock.leds[12][3], 30, "uncoloured pad keeps the dim blue tint")
+assert_eq(mock.leds[11][1], 127, "virtual pad 1 colour mirrored r")
+assert_eq(mock.leds[11][2], 0, "virtual pad 1 colour mirrored g")
+assert_eq(mock.leds[61][2], 127, "virtual pad 41 colour mirrored g (row 6)")
 -- exit: single tap, restores all notes and resets the MPC pad bank
 mock.reset()
 L.HandleMIDICC(0, 94, 127)

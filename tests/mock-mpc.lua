@@ -246,7 +246,17 @@ local padsControl = {
 	Tap = function() end,
 	Press = function() end,
 	Release = function() end,
+	virtual = {},
 }
+for i = 0, 127 do
+	local pcol = prop(0)
+	padsControl.virtual[i] = {
+		Colour = pcol,
+		GetColour = function()
+			return pcol.value
+		end,
+	}
+end
 for i = 0, 15 do
 	local pcol = prop(0)
 	padsControl[i] = {
