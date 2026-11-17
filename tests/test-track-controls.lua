@@ -19,6 +19,14 @@ local function assert_near(a, b, msg)
 	end
 end
 
+-- MPC fader curve: dB = 40*log10(gain) + 6; -inf is gain 0.
+local function db_gain(db)
+	if db <= -60 then
+		return 0
+	end
+	return 10 ^ ((db - 6) / 40)
+end
+
 L.OnLoad()
 
 -- Volume menu: press CC 4.
@@ -27,27 +35,30 @@ L.HandleMIDICC(0, 4, 127)
 assert_eq(mock.leds[4][1], 127, "volume button red")
 assert_eq(mock.leds[4][2], 127, "volume button green")
 assert_eq(mock.leds[4][3], 127, "volume button blue")
+-- Up/down are cyan while a menu is open.
+assert_eq(mock.leds[80][2], 127, "up lit in menu")
+assert_eq(mock.leds[70][2], 127, "down lit in menu")
 -- Grid pad col 0, top row (note 81) -> track 0 volume +6 dB.
 L.HandleMIDINoteOn(0, 81, 100)
-assert_near(mock.tracks[0].VolumeDB.value, 6, "volume top row = +6 dB")
+assert_near(mock.tracks[0].Volume.value, db_gain(6), "volume top row = +6 dB")
 -- The fader fills from the bottom: the bottom pad (note 11) is lit.
 assert_eq(mock.leds[11][1], 0, "fader bottom red")
 assert_eq(mock.leds[11][2], 127, "fader bottom green")
 assert_eq(mock.leds[11][3], 127, "fader bottom blue")
 -- Grid pad col 0, bottom row (note 11) -> track 0 volume -inf.
 L.HandleMIDINoteOn(0, 11, 100)
-assert_near(mock.tracks[0].VolumeDB.value, -100, "volume bottom row = -inf")
+assert_near(mock.tracks[0].Volume.value, 0, "volume bottom row = -inf")
 -- Up nudges one dB step: -inf -> -30 dB.
 L.HandleMIDICC(0, 80, 127)
-assert_near(mock.tracks[0].VolumeDB.value, -30, "volume up -> -30 dB")
+assert_near(mock.tracks[0].Volume.value, db_gain(-30), "volume up -> -30 dB")
 -- Down nudges back to -inf.
 L.HandleMIDICC(0, 70, 127)
-assert_near(mock.tracks[0].VolumeDB.value, -100, "volume down -> -inf")
+assert_near(mock.tracks[0].Volume.value, 0, "volume down -> -inf")
 -- Up clamps at +6 dB.
 for _ = 1, 10 do
 	L.HandleMIDICC(0, 80, 127)
 end
-assert_near(mock.tracks[0].VolumeDB.value, 6, "volume clamped at +6 dB")
+assert_near(mock.tracks[0].Volume.value, db_gain(6), "volume clamped at +6 dB")
 
 -- Pan menu: press CC 5.
 L.HandleMIDICC(0, 5, 127)
@@ -100,7 +111,7 @@ assert_eq(mock.count("TriggerClip"), 1, "clip launch after exit")
 L.HandleMIDICC(0, 92, 127) -- MoveRight(1)
 L.HandleMIDICC(0, 4, 127) -- volume menu
 L.HandleMIDINoteOn(0, 81, 100) -- grid column 0, top row
-assert_near(mock.tracks[1].VolumeDB.value, 6, "volume after scroll")
+assert_near(mock.tracks[1].Volume.value, db_gain(6), "volume after scroll")
 
 L.OnUnload()
 print("test-track-controls: PASS")

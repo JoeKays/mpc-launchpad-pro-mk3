@@ -41,10 +41,12 @@ L.HandleMIDICC(0, 3, 0)
 
 -- hold stop clip (108) + track 3 (CC 4)
 L.HandleMIDICC(0, 8, 127)
+assert_eq(mock.leds[8][1], 127, "stopClip button lit while held")
 L.HandleMIDICC(0, 104, 127)
 assert_eq(mock.count("StopClipsOnTrack"), 1, "StopClipsOnTrack")
 assert_eq(mock.find("StopClipsOnTrack")[1].args[1], 3, "track 3")
 L.HandleMIDICC(0, 8, 0)
+assert_eq(mock.leds[8][1], 12, "stopClip button dim after release")
 
 -- track select without a held function
 L.HandleMIDICC(0, 101, 127)

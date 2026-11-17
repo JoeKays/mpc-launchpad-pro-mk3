@@ -65,7 +65,6 @@ for i = 0, 7 do
 		Colour = prop(0x00FF00),
 		Name = prop("Track " .. i),
 		Volume = prop(0.5),
-		VolumeDB = prop(0),
 		Pan = prop(0.5),
 		Send1 = prop(0),
 		Send2 = prop(0),

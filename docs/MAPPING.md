@@ -84,9 +84,11 @@ Pan and sends use `(8 - row) / 8` (0..1).
 | Tap sends (CC 6) while the sends menu is open | Cycles send 1-4 |
 
 Volume writes `mpc.tracks.normalTracks[i].VolumeDB.value` (dB) and falls back to
-`.Volume.value` if `VolumeDB` is read-only. Pan writes `.Pan.value` (0..1, 0.5 = centre).
-Sends write `.Send1`..`.Send4.value` (0..1). The faders are cyan (volume), magenta (pan)
-and one colour per send (yellow/green/blue/orange); the active function button is white.
+`.Volume.value` if `VolumeDB` is read-only. The fallback inverts the measured MPC fader
+curve `dB = 40*log10(gain) + 6` (so 0 dB = gain 0.708, +6 dB = gain 1.0, -inf = gain 0).
+Pan writes `.Pan.value` (0..1, 0.5 = centre). Sends write `.Send1`..`.Send4.value` (0..1).
+The faders are cyan (volume), magenta (pan) and one colour per send
+(yellow/green/blue/orange); the active function button is white.
 
 ## Right column (CC 19-89 + 99)
 
@@ -146,10 +148,10 @@ working.
 - Grid: clip colour, dim when stopped, bright when playing/recording, blink when queued.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
-- Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, yellow sends), filled from the bottom.
-- Function buttons (CC 1-8): the held one white, others dim.
+- Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom.
+- Function buttons (CC 1-8): the held one white, others dim (including device and stop clip).
 - Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording.
+- Left column: play green while playing, record red while recording; duplicate/clear white while held; up/down cyan while a fader menu is open.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),

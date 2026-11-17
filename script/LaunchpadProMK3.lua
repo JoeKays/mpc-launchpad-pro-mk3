@@ -220,6 +220,24 @@ local function dbToRow(db)
 	return 0
 end
 
+-- MPC volume fader curve, measured on 3.10.1: dB = 40*log10(gain) + 6.
+-- Inverse: gain = 10^((dB - 6) / 40); -inf is gain 0.
+local function dbToGain(db)
+	db = tonumber(db)
+	if db == nil or db <= -60 then
+		return 0
+	end
+	return 10 ^ ((db - 6) / 40)
+end
+
+local function gainToDb(gain)
+	gain = tonumber(gain)
+	if gain == nil or gain <= 0 then
+		return -100
+	end
+	return 40 * math.log(gain, 10) + 6
+end
+
 local function trackAt(idx)
 	return mpc.tracks and mpc.tracks.normalTracks and mpc.tracks.normalTracks[idx]
 end
@@ -397,9 +415,10 @@ local function paintAdjustGrid()
 			local litCount
 			if adjustMode == "volume" then
 				-- dB fader: -inf = no pads, +6 dB = all 8 pads
-				local db = propValue(t, "VolumeDB")
+				local gain = propValue(t, "Volume")
+				local db = gainToDb(gain)
 				local row = dbToRow(db)
-				litCount = (db ~= nil and db <= -60) and 0 or (GRID_ROWS - row)
+				litCount = (db <= -60) and 0 or (GRID_ROWS - row)
 			else
 				local value = propValue(t, name) or 0
 				if type(value) ~= "number" then
@@ -489,14 +508,16 @@ local function paintTrack()
 	local volume = fnColour("volume")
 	local pan = fnColour("pan")
 	local sends = fnColour("sends")
+	local device = fnColour("device")
+	local stopClip = fnColour("stopClip")
 	ledRGB(TRACK.recArm, arm[1], arm[2], arm[3])
 	ledRGB(TRACK.mute, mute[1], mute[2], mute[3])
 	ledRGB(TRACK.solo, solo[1], solo[2], solo[3])
 	ledRGB(TRACK.volume, volume[1], volume[2], volume[3])
 	ledRGB(TRACK.pan, pan[1], pan[2], pan[3])
 	ledRGB(TRACK.sends, sends[1], sends[2], sends[3])
-	ledRGB(TRACK.device, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(TRACK.stopClip, C.dim[1], C.dim[2], C.dim[3])
+	ledRGB(TRACK.device, device[1], device[2], device[3])
+	ledRGB(TRACK.stopClip, stopClip[1], stopClip[2], stopClip[3])
 	-- CC 101-108: track buttons. Show the held function's state per track, or the track colour.
 	for col = 0, 7 do
 		local gc = globalPos(col, 0)
@@ -575,10 +596,33 @@ local function paintLeft()
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
 	ledRGB(LEFT.fixedLength, C.dim[1], C.dim[2], C.dim[3])
 	ledRGB(LEFT.quantize, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(LEFT.duplicate, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(LEFT.clear, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(LEFT.down, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(LEFT.up, C.dim[1], C.dim[2], C.dim[3])
+	local dupOn = clipOp == "duplicate"
+	local clearOn = clipOp == "clear"
+	local nudgeOn = adjustMode ~= nil
+	ledRGB(
+		LEFT.duplicate,
+		dupOn and C.white[1] or C.dim[1],
+		dupOn and C.white[2] or C.dim[2],
+		dupOn and C.white[3] or C.dim[3]
+	)
+	ledRGB(
+		LEFT.clear,
+		clearOn and C.white[1] or C.dim[1],
+		clearOn and C.white[2] or C.dim[2],
+		clearOn and C.white[3] or C.dim[3]
+	)
+	ledRGB(
+		LEFT.down,
+		nudgeOn and C.cyan[1] or C.dim[1],
+		nudgeOn and C.cyan[2] or C.dim[2],
+		nudgeOn and C.cyan[3] or C.dim[3]
+	)
+	ledRGB(
+		LEFT.up,
+		nudgeOn and C.cyan[1] or C.dim[1],
+		nudgeOn and C.cyan[2] or C.dim[2],
+		nudgeOn and C.cyan[3] or C.dim[3]
+	)
 end
 
 local function paintRight()
@@ -817,9 +861,8 @@ local function setTrackVolumeDB(idx, db)
 			return
 		end
 	end
-	-- fallback: approximate linear value from dB (0 dB ~= 0.75 on the MPC curve)
-	local linear = db <= -60 and 0 or clamp01((db + 60) / 66)
-	setTrackValue(idx, "Volume", linear)
+	-- fallback: invert the MPC fader curve (dB = 40*log10(gain) + 6)
+	setTrackValue(idx, "Volume", dbToGain(db))
 end
 
 local function nudgeAdjust(delta)
@@ -832,7 +875,7 @@ local function nudgeAdjust(delta)
 		return
 	end
 	if adjustMode == "volume" then
-		local db = propValue(trackAt(gc), "VolumeDB")
+		local db = gainToDb(propValue(trackAt(gc), "Volume"))
 		local row = dbToRow(db)
 		if delta > 0 then
 			row = math.max(0, row - 1)

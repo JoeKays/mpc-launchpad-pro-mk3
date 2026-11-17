@@ -24,7 +24,7 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | Limit | Status |
 |---|---|
 | **Q-links** | Not implemented (later phase). |
-| **Volume/pan/sends menus** | Grid pads set 8 discrete values; volume uses clean dB steps (-inf, -30, -20, -9, -3, 0, +3, +6 dB), pan/sends use `(8 - row) / 8`; up/down nudge one step. No finer control. |
+| **Volume/pan/sends menus** | Grid pads set 8 discrete values; volume uses clean dB steps (-inf, -30, -20, -9, -3, 0, +3, +6 dB) via the measured fader curve `dB = 40*log10(gain) + 6`, pan/sends use `(8 - row) / 8`; up/down nudge one step. No finer control. |
 | **Track device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |

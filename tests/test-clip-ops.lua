@@ -19,6 +19,7 @@ L.OnLoad()
 -- Clip ops use the global matrix position (same coords as HasClip/TriggerClip),
 -- so the window origin is added. Note 11 is col 0, visual row 7 (bottom).
 L.HandleMIDICC(0, 60, 127)
+assert_eq(mock.leds[60][1], 127, "clear button lit while held")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("DeleteClip"), 1, "clear -> DeleteClip")
 assert_eq(mock.find("DeleteClip")[1].args[1], 0, "DeleteClip col")
@@ -32,11 +33,13 @@ assert_eq(mock.find("DeleteClip")[2].args[2], 7, "second DeleteClip row")
 
 -- Releasing clear disarms it: the next pad must not delete.
 L.HandleMIDICC(0, 60, 0)
+assert_eq(mock.leds[60][1], 12, "clear button dim after release")
 L.HandleMIDINoteOn(0, 13, 100)
 assert_eq(mock.count("DeleteClip"), 2, "released clear does not delete")
 
 -- duplicate (CC 50) is hold-to-arm: origin pad, then any number of targets.
 L.HandleMIDICC(0, 50, 127)
+assert_eq(mock.leds[50][1], 127, "duplicate button lit while held")
 L.HandleMIDINoteOn(0, 11, 100) -- origin col 0, visual row 7
 assert_eq(mock.count("CopyClip"), 0, "origin does not copy yet")
 L.HandleMIDINoteOn(0, 12, 100) -- target col 1
