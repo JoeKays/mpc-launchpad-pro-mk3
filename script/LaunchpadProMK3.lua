@@ -693,19 +693,28 @@ local function setQlinkPosition(i, pos)
 	log(string.format("qlink %d = %d (%s)", i, pos, tostring(call(q.GetValueString) or "")))
 end
 
+-- A qlink with an empty target name is unassigned in the current Q-Link mode: its
+-- column stays fully dark so the grid only shows faders that control something.
+local function qlinkAssigned(i)
+	return qlinkTargetName(i) ~= ""
+end
+
 local function paintQlinkGrid()
 	local count = qlinkCount()
 	for col = 0, GRID_COLS - 1 do
 		local i = qlinkPage * GRID_COLS + col
-		local pos = (i < count) and qlinkPosition(i) or 0
+		local assigned = i < count and qlinkAssigned(i)
+		local pos = assigned and qlinkPosition(i) or 0
 		local litCount = math.floor(pos / 127 * GRID_ROWS + 0.5)
 		for row = 0, GRID_ROWS - 1 do
 			local idx = 10 * (8 - row) + col + 1
 			local fromBottom = 7 - row
-			if i < count and fromBottom < litCount then
+			if assigned and fromBottom < litCount then
 				ledRGB(idx, C.cyan[1], C.cyan[2], C.cyan[3])
-			else
+			elseif assigned then
 				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+			else
+				ledOff(idx)
 			end
 		end
 	end
@@ -713,7 +722,7 @@ end
 
 local function handleQlinkPad(col, row)
 	local i = qlinkPage * GRID_COLS + col
-	if i >= qlinkCount() then
+	if i >= qlinkCount() or not qlinkAssigned(i) then
 		return
 	end
 	local target = math.floor((GRID_ROWS - row) / GRID_ROWS * 127 + 0.5)

@@ -177,6 +177,12 @@ local commandManager = {
 	end,
 }
 
+-- per-qlink target names; nil = the default "target<i>" (assigned)
+local qlinkTargets = {}
+function M.setQlinkTarget(i, name)
+	qlinkTargets[i] = name
+end
+
 -- Q-Links (mpc.controlSurface.qlinks, 0-based, 16 knobs); SetPosition writes the position,
 -- Twist moves it by a delta (clamped 0-127), Touch records a touch.
 local qlinkPositions = {}
@@ -204,7 +210,7 @@ for i = 0, 15 do
 			return tostring(qlinkPositions[i] or 0)
 		end,
 		GetTargetName = function()
-			return "target" .. i
+			return qlinkTargets[i] or ("target" .. i)
 		end,
 	}
 end
@@ -514,6 +520,9 @@ end
 function M.reset()
 	M.calls = {}
 	M.leds = {}
+	for k in pairs(qlinkTargets) do
+		qlinkTargets[k] = nil
+	end
 end
 
 function M.find(name)

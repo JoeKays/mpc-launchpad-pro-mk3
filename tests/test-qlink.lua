@@ -112,4 +112,17 @@ assert_eq(mock.leds[7][2], 60, "device button available (green)")
 assert_eq(mock.leds[7][3], 60, "device button available (blue)")
 
 L.OnUnload()
+-- Unassigned qlinks (empty target name): column dark, presses ignored.
+mock.setQlinkTarget(1, "")
+mock.setQlinkTarget(0, "Kill EQ Low")
+L.HandleMIDICC(0, 7, 127) -- re-enter to repaint
+local savedPos = mock.qlinks[1]:GetPosition()
+L.HandleMIDINoteOn(0, 12, 100) -- column 1 pad
+assert_eq(mock.qlinks[1]:GetPosition(), savedPos, "unassigned qlink untouched")
+assert_eq(mock.leds[12] and mock.leds[12][2] or 0, 0, "unassigned column dark")
+assert_eq(mock.leds[11][2], 127, "assigned column still cyan")
+mock.reset()
+mock.setQlinkTarget(0, "Kill EQ Low")
+mock.setQlinkTarget(1, "")
+
 print("test-qlink: PASS")

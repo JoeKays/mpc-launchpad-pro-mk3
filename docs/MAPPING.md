@@ -162,6 +162,8 @@ GetPosition())` with the delta clamped to ±127, repeated at most twice to absor
 string)`. If a qlink object has no `Twist`, the script falls back to `SetPosition(target)`
 and logs `qlink N = pos (setpos)` — `SetPosition` alone updates the Q-Link's ValueString
 but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMITATIONS).
+Q-Links with an empty target name (unassigned in the current Q-Link mode) stay fully
+dark and their pads are inert — the grid only shows faders that control something.
 The page is mutually exclusive with the fader menus, the tempo page and the swing page.
 The device button is white while the page is open and light grey when
 `controlSurface.qlinks` (or the tempo page's `sequencer.SetBPM`) exists; Shift + CC 7
