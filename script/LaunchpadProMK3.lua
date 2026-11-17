@@ -938,14 +938,18 @@ end
 -- Pads mode grid: the bottom-left 4x4 quadrant mirrors mpc.controlSurface.pads[i].Colour
 -- (ARGB int, alpha ignored); the rest of the grid is dark. poll=true re-reads the pad
 -- colours; padsColourCache keeps the last ARGB per pad so only diffs are sent.
--- Chromatic layout LEDs: a plain dim note grid with C notes brighter so the octave
--- shape is visible (no MPC pad colours exist for virtual pads).
+-- Chromatic layout LEDs: blue note grid, C notes full blue and the rest a dim blue
+-- tint, so the octave shape is visible without any white (no MPC pad colours exist
+-- for virtual pads).
 local function paintChromaticGrid()
 	for padRow = 0, 7 do
 		for col = 0, 7 do
 			local idx = 10 * (padRow + 1) + col + 1
-			local v = (chromaticVirtualPad(padRow, col) % 12 == 0) and 30 or 12
-			ledRGB(idx, v, v, v)
+			if chromaticVirtualPad(padRow, col) % 12 == 0 then
+				ledRGB(idx, C.blue[1], C.blue[2], C.blue[3])
+			else
+				ledRGB(idx, 0, 15, 30)
+			end
 		end
 	end
 end

@@ -212,7 +212,8 @@ Tapping the Note button iterates: clip grid -> **drum** -> **chromatic** -> clip
 - **chromatic**: the whole 8x8 grid plays chromatic notes in perfect 4ths (each row
   +5 semitones) through `mappings.pads.AddNoteToVirtualPad` — virtual pads are the
   MPC's note-addressed pad input. The base note (default 48) shifts an octave with
-  up/down (CC 80/70) while the mode is open. LEDs: dim note grid, C notes brighter.
+  up/down (CC 80/70) while the mode is open. LEDs: blue note grid, C notes full blue
+  and the rest a dim blue tint.
   The note button shows cyan in this layout (white in drum).
 
 Press the mode button again, press CC 93 (session), enter another mode or page, or
