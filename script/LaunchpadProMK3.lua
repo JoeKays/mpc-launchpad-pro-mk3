@@ -930,20 +930,20 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	if col then
 		if velocity > 0 then
 			if clipOp == "clear" then
-				local apiRow = 7 - row
-				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, col, apiRow)
-				log(string.format("DeleteClip(%d,%d)", col, apiRow))
+				local gc, gr = globalPos(col, row)
+				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, gc, gr)
+				log(string.format("DeleteClip(%d,%d)", gc, gr))
 				paintAll()
 			elseif clipOp == "duplicate" then
+				local gc, gr = globalPos(col, row)
 				if clipOrigin == nil then
-					clipOrigin = { col, row }
-					log(string.format("duplicate origin (%d,%d)", col, row))
+					clipOrigin = { gc, gr }
+					log(string.format("duplicate origin (%d,%d)", gc, gr))
 				else
-					local fromRow = 7 - clipOrigin[2]
-					local toRow = 7 - row
-					call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], fromRow, col, toRow)
-					log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], fromRow, col, toRow))
-					clipOrigin = nil
+					call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], clipOrigin[2], gc, gr)
+					log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], clipOrigin[2], gc, gr))
+					-- keep the origin so one source can be copied to many targets
+					-- while the duplicate button is held
 					paintAll()
 				end
 			elseif adjustMode then
@@ -972,6 +972,13 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		if cc == TOP.shift then
 			shift = false
 			paintTop()
+			flushLEDs()
+		end
+		-- clip ops are hold-to-arm: releasing clear/duplicate disarms them
+		if cc == LEFT.clear or cc == LEFT.duplicate then
+			clipOp = nil
+			clipOrigin = nil
+			paintAll()
 			flushLEDs()
 		end
 		local fn = TRACK_FN[cc]

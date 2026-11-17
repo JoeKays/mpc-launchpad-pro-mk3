@@ -8,13 +8,17 @@ dofile("script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
-  if a ~= b then error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a)) end
+	if a ~= b then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 L.OnLoad()
 L.HandleMIDICC(0, 20, 127) -- play
 assert_eq(mock.count("Play"), 1, "Play")
-mock.sequencer.IsPlaying = function() return true end
+mock.sequencer.IsPlaying = function()
+	return true
+end
 L.HandleMIDICC(0, 20, 127) -- play while playing -> stop
 assert_eq(mock.count("Stop"), 1, "Stop")
 L.HandleMIDICC(0, 10, 127) -- record

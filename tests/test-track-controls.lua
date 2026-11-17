@@ -8,13 +8,15 @@ dofile("script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
-  if a ~= b then error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a)) end
+	if a ~= b then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 local function assert_near(a, b, msg)
-  if math.abs(a - b) > 1e-6 then
-    error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
-  end
+	if math.abs(a - b) > 1e-6 then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 L.OnLoad()
@@ -44,7 +46,9 @@ assert_near(mock.tracks[0].Volume.value, 1 / 8, "volume down 1/8")
 L.HandleMIDICC(0, 70, 127)
 assert_near(mock.tracks[0].Volume.value, 0.0, "volume clamped at 0")
 -- Up clamps at 1.
-for _ = 1, 10 do L.HandleMIDICC(0, 80, 127) end
+for _ = 1, 10 do
+	L.HandleMIDICC(0, 80, 127)
+end
 assert_near(mock.tracks[0].Volume.value, 1.0, "volume clamped at 1")
 
 -- Pan menu: press CC 5.

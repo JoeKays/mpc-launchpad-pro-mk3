@@ -29,7 +29,7 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
 | **Save/quantize** | Stubbed with `TODO` logs. |
-| **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: arm CC 50/60, then press the origin/target or clip pad. If the API is missing the script logs the attempted call and does nothing. |
+| **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |
 | **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
 | **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. |
 | **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |

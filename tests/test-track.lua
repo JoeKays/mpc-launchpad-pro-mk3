@@ -7,7 +7,9 @@ dofile("script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
-  if a ~= b then error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a)) end
+	if a ~= b then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 L.OnLoad()

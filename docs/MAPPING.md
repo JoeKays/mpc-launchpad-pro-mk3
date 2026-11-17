@@ -118,18 +118,20 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 20 | play | `IsPlaying` ? `Stop` : `Play` |
 | 30 | fixed length | stub |
 | 40 | quantize/record quantize | stub (no clip-quantize API in the 3.10.1 contract) |
-| 50 | duplicate/double | arm duplicate, press the origin clip pad, then the target clip pad (`clipMatrix.CopyClip`) |
-| 60 | clear | arm clear, press the clip pad (`clipMatrix.DeleteClip`) |
+| 50 | duplicate/double | hold duplicate, press the origin clip pad, then one or more target clip pads (`clipMatrix.CopyClip`) |
+| 60 | clear | hold clear, press one or more clip pads (`clipMatrix.DeleteClip`) |
 | 70 | down | window down (`MoveDown`); Shift = 8 |
 | 80 | up | window up (`MoveUp`); Shift = 8 |
 
 CC 50/60 use `mpc.clipMatrix.CopyClip(fromColumn, fromRow, toColumn, toRow)` and
-`mpc.clipMatrix.DeleteClip(column, row)`. Press CC 50 to arm duplicate, press the origin
-clip pad, then the target clip pad. Press CC 60 to arm clear, then press the clip pad.
-The op stays armed after each clip, so you can clear or duplicate several clips while
-holding the button; duplicate resets the origin after each copy. The API row is
-`7 - visual row` (the API counts from the bottom). The calls are guarded: if the API is
-missing the script logs the attempted call and leaves the surface working.
+`mpc.clipMatrix.DeleteClip(column, row)`. Both are **hold-to-arm**: the op is active only
+while CC 50/60 is held and is disarmed on release. Hold CC 50, press the origin clip pad,
+then press any number of target pads — the origin stays fixed so one source can be copied
+to many targets. Hold CC 60 and press each clip pad to clear it. Clip ops use the **global**
+matrix position (`aperture.ToGlobalColumn/ToGlobalRow`), the same coordinates as
+`HasClip`/`TriggerClip`, so they stay correct when the window is scrolled. The calls are
+guarded: if the API is missing the script logs the attempted call and leaves the surface
+working.
 
 ## LED feedback
 

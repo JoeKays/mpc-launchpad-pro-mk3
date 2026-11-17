@@ -8,16 +8,20 @@ dofile("script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
-  if a ~= b then error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a)) end
+	if a ~= b then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 -- capture the script's log output so the stub/degrade paths can be asserted
 local logs = {}
 local realPrint = print
-_G.print = function(msg) logs[#logs + 1] = tostring(msg) end
+_G.print = function(msg)
+	logs[#logs + 1] = tostring(msg)
+end
 
 local function lastLog()
-  return logs[#logs] or ""
+	return logs[#logs] or ""
 end
 
 L.OnLoad()
@@ -92,7 +96,11 @@ assert_eq(lastLog(), "LaunchpadProMK3: Redo unavailable: commandManager.Redo mis
 L.HandleMIDICC(0, 2, 0)
 mock.mpc.sequencer = nil
 L.HandleMIDICC(0, 3, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: metronome unavailable: sequencer.SetMetronomeEnabled missing", "metronome degrade log")
+assert_eq(
+	lastLog(),
+	"LaunchpadProMK3: metronome unavailable: sequencer.SetMetronomeEnabled missing",
+	"metronome degrade log"
+)
 L.HandleMIDICC(0, 3, 0)
 L.HandleMIDICC(0, 90, 0)
 

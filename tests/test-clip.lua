@@ -8,7 +8,9 @@ dofile("script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
-  if a ~= b then error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a)) end
+	if a ~= b then
+		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
+	end
 end
 
 L.OnLoad()
@@ -21,7 +23,11 @@ assert(mock.count("AddCCToScript") >= 40, "edge CCs registered")
 
 -- initial grid paint: 64 pads
 local painted = 0
-for i = 11, 88 do if mock.leds[i] then painted = painted + 1 end end
+for i = 11, 88 do
+	if mock.leds[i] then
+		painted = painted + 1
+	end
+end
 assert(painted >= 64, "grid painted")
 
 -- pad press -> TriggerClip(0,0)
