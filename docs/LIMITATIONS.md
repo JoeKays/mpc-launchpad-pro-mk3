@@ -28,14 +28,10 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Volume/pan/sends menus** | Grid pads set 8 discrete values; volume uses clean dB steps (-inf, -30, -20, -9, -3, 0, +3, +6 dB) via the measured fader curve `dB = 40*log10(gain) + 6`, pan/sends use `(8 - row) / 8`; up/down nudge one step. No finer control. |
 | **Track device (CC 7)** | Implemented as the Q-Link page above; Shift + CC 7 remains the tempo page. Device hold for track functions is no longer available (it was unsupported anyway). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
-<<<<<<< HEAD
-| **Chord mode (CC 95)** | Stubbed with a `TODO` log. |
+| **Chord mode (CC 95)** | Stubbed with a `TODO` log. Shift + CC 94/95 doubles as plugin preset prev/next. |
 | **MPC pads mode (CC 94)** | Implemented: the bottom-left 4x4 grid quadrant is hardware-routed to the MPC pads (`mappings.pads.AddNoteToMpcPad`; the notes no longer reach the script) and mirrors `controlSurface.pads[i].Colour` (ARGB, alpha ignored). The mirror is polled from the timer every ~100 ms (there are no pad-colour listeners), so a colour change can lag up to ~100 ms; only changed colours are sent. The rest of the grid is dark and inert while the mode is open. |
 | **Track mute mode (CC 96)** | Implemented: the bottom two grid rows are hardware-routed to the track mutes (`mappings.tracks.mutes.AddNoteToTrackMute`), always tracks 0-15, independent of the grid window. Unmuted pads show the track colour, muted pads dim grey; tracks beyond `SizeNormalTracks` stay dark. |
 | **Pad modes vs pages** | CC 94/96, the volume/pan/sends menus and the tempo/swing pages are mutually exclusive: entering any of them closes the others (and armed clip ops); CC 93 (session) or another mode also leaves a pad mode. |
-=======
-| **Note/chord/custom modes** | Stubbed; the script only switches the mode label. Shift + CC 94/95 doubles as plugin preset prev/next (see above). |
->>>>>>> lane/buttons
 | **Save** | Stubbed with a `TODO` log. |
 | **Quantize** | CC 40 applies quantize via `mpc.controlSurface.quantizeApply.Press()`/`Release()`; the quantize button is white when the control exists. The quantize settings live on `mpc.sequencer.quantiser` (`SetEnabled`, `SetStrength`, `SetTimeDivision`, `SetWindow`, `SetShift`, `SetSwing`). |
 | **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |

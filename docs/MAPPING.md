@@ -140,7 +140,6 @@ then 50 ms). The pads are inert on this page. The swing value is read/written th
 `mpc.sequencer.quantiser.GetSwing()` / `SetSwing(50-75)`; the stop-clip button (CC 8) is
 white while the page is open and the up/down arrows take the swing page colour (yellow).
 
-<<<<<<< HEAD
 ### Q-Link page (CC 7)
 
 Press device (CC 7) to toggle the Q-Link page. The grid shows the MPC Q-Links
@@ -166,7 +165,7 @@ The page is mutually exclusive with the fader menus, the tempo page and the swin
 The device button is white while the page is open and light grey when
 `controlSurface.qlinks` (or the tempo page's `sequencer.SetBPM`) exists; Shift + CC 7
 stays the tempo page.
-=======
+
 ### Pad modes (CC 94 MPC pads, CC 96 track mute)
 
 CC 94 (note) and CC 96 (custom) are pad modes: they hand a block of grid pads to the MPC
@@ -196,7 +195,6 @@ stay dark. The custom button is white while the mode is open, lighter grey when
 
 If the mappings are missing the mode button stays off and pressing it changes nothing
 (the surface keeps today's behaviour).
->>>>>>> lane/pad-modes
 
 ### Quantize (CC 40)
 
@@ -230,15 +228,9 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 91 | < | window left (`MoveLeft`); Shift = previous track (`currentTrack.Previous`) |
 | 92 | > | window right (`MoveRight`); Shift = next track (`currentTrack.Next`) |
 | 93 | session | clip mode |
-<<<<<<< HEAD
-| 94 | note | MPC pads mode: the bottom-left 4x4 quadrant mirrors the MPC pad colours and plays the MPC pads; press again to exit |
-| 95 | chord | chord mode (stub) |
-| 96 | custom | track mute mode: the bottom two grid rows toggle the mutes of tracks 0-15; press again to exit |
-=======
-| 94 | note | note mode (stub); Shift = previous plugin preset (`currentTrack.PrevPluginPreset`) |
+| 94 | note | MPC pads mode: the bottom-left 4x4 quadrant mirrors the MPC pad colours and plays the MPC pads; press again to exit. Shift = previous plugin preset (`currentTrack.PrevPluginPreset`) |
 | 95 | chord | chord mode (stub); Shift = next plugin preset (`currentTrack.NextPluginPreset`) |
-| 96 | custom | custom mode (stub) |
->>>>>>> lane/buttons
+| 96 | custom | track mute mode: the bottom two grid rows toggle the mutes of tracks 0-15; press again to exit |
 | 97 | sequencer | step mode (stub) |
 | 98 | projects/save | save (stub) |
 
@@ -271,15 +263,9 @@ working.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
-<<<<<<< HEAD
 - Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected (the device button is white while the Q-Link page or tempo page is open).
-- Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page, swing page or Q-Link page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing, cyan Q-Link). Fixed length is a stub and stays off.
-=======
-- Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected.
 - Top row: current mode white, others dim; Shift white while held; note (CC 94) and custom (CC 96) show pad-mode availability (lighter grey, off without the mappings) and turn white while their pad mode is open.
-- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page or swing page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing). Fixed length is a stub and stays off.
->>>>>>> lane/pad-modes
+- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page, swing page or Q-Link page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing, cyan Q-Link). Fixed length is a stub and stays off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 - Pad modes: MPC pads mode mirrors the MPC pad colours on the bottom-left 4x4 quadrant (diff-only, polled every 100 ms); track mute mode shows the track colour per unmuted pad and dim grey per muted pad on the bottom two rows; the active mode button is white.
 

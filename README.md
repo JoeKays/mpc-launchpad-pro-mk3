@@ -10,20 +10,10 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-<<<<<<< HEAD
-<<<<<<< HEAD
 track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page +
-live clip states (listener-driven LEDs, current-track follow) are implemented and host-tested.
-=======
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize + MPC pads mode +
-track mute mode are implemented and host-tested.
-Track device and Q-links are stubbed for later phases.
->>>>>>> lane/pad-modes
-=======
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page +
-the Shift transport buttons (loop/overdub/quantiser/automation filter), track navigation,
-plugin presets and the firmware probe are implemented and host-tested.
->>>>>>> lane/buttons
+live clip states (listener-driven LEDs, current-track follow) + MPC pads mode + track
+mute mode + the Shift transport buttons (loop/overdub/quantiser/automation filter) +
+track navigation, plugin presets and the firmware probe are implemented and host-tested.
 
 ## What it does
 
@@ -36,20 +26,15 @@ plugin presets and the firmware probe are implemented and host-tested.
 - **Scene launch**: right column CC 89-19 launches scene rows 0-7 (89 = top row, 19 = bottom).
   Shift + those = the label functions (patterns/steps/pattern settings/velocity/probability/
   mutation/micro step/print to clip).
-<<<<<<< HEAD
-- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift moves by 8. Scrolling
-  re-registers the slot listeners for the new window.
+- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift + 80/70 moves by 8,
+  Shift + 91/92 = previous/next track. Scrolling re-registers the slot listeners for the
+  new window.
 - **Follow current track**: the grid follows MPC's current track (`currentTrack.Index`
   listener moves the window; the master track shows the Master matrix). The track row
   (CC 101-108) selects tracks, so the grid follows track selection.
-- **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo.
-=======
-- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift + 80/70 moves by 8,
-  Shift + 91/92 = previous/next track.
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo,
   Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle,
   Shift + 40 = quantiser on/off.
->>>>>>> lane/buttons
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
   Shift + < / > (CC 91/92) = previous/next track; Shift + note/chord (CC 94/95) =
   previous/next plugin preset on the current track.
@@ -69,16 +54,12 @@ plugin presets and the firmware probe are implemented and host-tested.
   grid, up/down + hold to accelerate); Shift + CC 8 = swing page (swing % on the grid,
   50-75 where 50% is straight timing, up/down + hold to accelerate; reads/writes
   `sequencer.quantiser.GetSwing`/`SetSwing`).
-<<<<<<< HEAD
 - **Q-Link page**: CC 7 (device) toggles the Q-Link page; the grid shows Q-Links 0-7 as
   cyan faders (up/down switches to Q-Links 8-15), press a pad to set that Q-Link,
   Shift+up/down nudges the last touched column by 1; press CC 7 again to exit. Changes go
   through `controlSurface.qlinks[i]` `Touch()` + `Twist(delta)` — `SetPosition` updates the
   ValueString but not the edit-mode value, so it is only the missing-`Twist` fallback.
   Shift + CC 7 remains the tempo page.
-- **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
-  clip/step/track modes.
-=======
 - **MPC pads mode**: CC 94 hands the bottom-left 4x4 grid quadrant to the MPC pads
   (hardware-routed via `mappings.pads`) and mirrors the MPC pad colours on their LEDs;
   press again (or CC 93) to return to the clip grid.
@@ -88,7 +69,6 @@ plugin presets and the firmware probe are implemented and host-tested.
 - **Modes**: 93 session = clip, 94 note = MPC pads mode, 96 custom = track mute mode,
   97 sequencer = step (stub); Shift + right-column 89/79/69 = clip/step/track modes.
   Pad modes, fader menus and tempo/swing pages are mutually exclusive.
->>>>>>> lane/pad-modes
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
   pressed control white — use it to verify the physical mapping on your unit.
 
