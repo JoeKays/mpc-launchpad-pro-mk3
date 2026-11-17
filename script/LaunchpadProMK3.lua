@@ -1562,17 +1562,25 @@ local function enterPadsMode()
 	log("pads mode on (" .. padsLayout .. ", base " .. (padsLayout == "chromatic" and padsBaseNote or "drum") .. ")")
 end
 
+-- Tapping Note iterates: clip grid -> drum layout -> chromatic layout -> clip grid.
 local function togglePadsMode()
-	if padsMode then
+	if not padsMode then
+		padsLayout = "drum"
+		closeGridStates()
+		enterPadsMode()
+		if padsMode then
+			paintPadsGrid(true) -- immediate mirror, independent of the tick parity
+		end
+		return
+	end
+	if padsLayout == "drum" then
+		padsLayout = "chromatic"
 		exitPadsMode()
+		enterPadsMode()
 		return
 	end
 	exitPadsMode()
-	closeGridStates()
-	enterPadsMode()
-	if padsMode then
-		paintPadsGrid(true) -- immediate mirror, independent of the tick parity
-	end
+	paintAll()
 end
 
 local function setMode(m)
@@ -2235,14 +2243,6 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if cc == TOP.note then
 		togglePadsMode()
-		paintAll()
-		return
-	end
-	if padsMode and (cc == TOP.left or cc == TOP.right) then
-		-- inside pads mode the window scroll is unused: < > switch the layout instead
-		padsLayout = (padsLayout == "drum") and "chromatic" or "drum"
-		exitPadsMode()
-		enterPadsMode()
 		paintAll()
 		return
 	end

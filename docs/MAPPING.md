@@ -201,7 +201,8 @@ of the grid is dark and inert. Press the mode button again, press CC 93 (session
 another mode or page, or unload to exit: the 16 notes return to the script and the
 normal clip grid is repainted.
 
-Two layouts, switched with `<` / `>` (CC 91/92) while the mode is open:
+Tapping the Note button iterates: clip grid -> **drum** -> **chromatic** -> clip grid
+(CC 93 session also exits at any point):
 
 - **drum** (default): pad 0-15 maps to the bottom-left 4x4 quadrant (`col = pad % 4`,
   `padRow = pad // 4`, `note = 10*(padRow+1)+col+1`, so pad 0 = note 11). Each note is

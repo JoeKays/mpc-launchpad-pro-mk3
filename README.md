@@ -63,10 +63,10 @@ track navigation, plugin presets and the firmware probe are implemented and host
   parameters are learned while you play: presses round to the extremes and the column
   shows a single lit extreme pad. Unassigned Q-Links stay dark. Shift + CC 7 remains
   the tempo page.
-- **MPC pads mode**: CC 94 opens a playable pads mode with two layouts switched by
-  `<`/`>`: drum (bottom-left 4x4 = MPC pad bank A, colours mirrored) and chromatic
-  (full grid in perfect 4ths via virtual pads, octave shifted by up/down, C notes
-  marked); press again (or CC 93) to return to the clip grid.
+- **MPC pads mode**: tapping CC 94 iterates clip grid -> drum (bottom-left 4x4 =
+  MPC pad bank A, colours mirrored) -> chromatic (full grid in perfect 4ths via
+  virtual pads, octave shifted by up/down, C notes marked) -> clip grid (CC 93 also
+  exits at any point).
 - **Modes**: 93 session = clip (Shift = toggle follow), 94 note = MPC pads mode,
   95 chord = cycles the MPC's keyboard/chord pad modes inside pads mode, 96 custom =
   stub, 97 sequencer = opens the MPC step seq view (Shift = next bar); Shift + 98 =

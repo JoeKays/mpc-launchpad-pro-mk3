@@ -98,14 +98,13 @@ L.HandleMIDICC(0, 80, 127)
 assert_eq(mock.count("SetBPM"), 1, "tempo page closed by pads mode")
 assert_eq(mock.count("MoveUp"), 1, "up moves the window again")
 
--- Exit pads mode (CC 94 again): the notes return to the script, clips launch.
+-- Exiting to the clip grid now takes two more taps (drum -> chromatic -> off).
 mock.reset()
-L.HandleMIDICC(0, 94, 127)
-assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "pads exit unbinds the pads")
-assert_eq(mock.count("AddNoteToScript"), 16, "pads exit restores the notes")
-for i, note in ipairs(PAD_NOTES) do
-	assert_eq(mock.find("AddNoteToScript")[i].args[2], note, "pads exit restored note " .. i)
-end
+L.HandleMIDICC(0, 94, 127) -- drum -> chromatic
+assert_eq(mock.count("AddNoteToVirtualPad"), 64, "second tap is chromatic, not exit")
+mock.reset()
+L.HandleMIDICC(0, 94, 127) -- chromatic -> off
+assert_eq(mock.count("AddNoteToScript"), 64, "exit restores all 64 notes")
 assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
@@ -163,13 +162,12 @@ mock.reset()
 L.HandleMIDICC(0, 95, 127)
 assert_eq(mock.count("noteRepeat.Press"), 0, "no pad utility outside pads mode")
 
--- Chromatic layout: < > switches layouts inside pads mode; the whole grid maps to
--- virtual pads in 4ths; up/down shifts the base note by an octave.
+-- Tapping Note iterates the layouts: clip grid -> drum -> chromatic -> clip grid.
 mock.reset()
 L.HandleMIDICC(0, 94, 127) -- enter pads mode (drum)
-assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout on enter")
-L.HandleMIDICC(0, 92, 127) -- > switches to chromatic
-assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "drum unbound on switch")
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout on first tap")
+L.HandleMIDICC(0, 94, 127) -- second tap: chromatic
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "drum unbound on the second tap")
 assert_eq(mock.count("AddNoteToVirtualPad"), 64, "64 virtual pads bound")
 local first = mock.find("AddNoteToVirtualPad")[1]
 assert_eq(first.args[3], 48, "bottom-left virtual pad = base 48")
@@ -186,13 +184,11 @@ L.HandleMIDICC(0, 80, 127)
 assert_eq(latestVirtual().args[3], 60, "base shifted +12")
 L.HandleMIDICC(0, 70, 127)
 assert_eq(latestVirtual().args[3], 48, "base shifted back")
--- < returns to drum layout
-L.HandleMIDICC(0, 91, 127)
-assert_eq(mock.count("AddNoteToMpcPad"), 32, "drum re-entered (16 + 16)")
--- exit restores everything
+-- third tap exits back to the clip grid
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
-assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "exit unbinds drum pads")
-assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the notes")
+assert_eq(mock.count("RemoveNoteToVirtualPad"), 64, "exit unbinds the virtual pads")
+assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
+assert_eq(mock.leds[94][1], 60, "note button available after exit")
 
 print("test-pad-modes: PASS")
