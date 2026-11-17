@@ -32,6 +32,8 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |
 | **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
 | **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. Volume writes `VolumeDB` (dB) with a `Volume` fallback; sends 1-4 use different colours. |
+| **Stop clip** | Hold CC 8 + a track button (CC 101-108) or a clip pad stops that track's clips (`aperture.StopClipsOnTrack`); the clip pad does not launch while stop clip is held. |
+| **Empty tracks** | Fader menus only light tracks below `mpc.tracks.SizeNormalTracks`; empty tracks stay dark. |
 | **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome; Shift + CC 6/7/8 = tap tempo/tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |

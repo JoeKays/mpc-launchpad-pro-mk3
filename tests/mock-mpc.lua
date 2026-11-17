@@ -282,9 +282,16 @@ local timer = {
 }
 
 -- assemble
+local normalTrackCount = 8
 local mpc = {
 	clipMatrix = clipMatrix,
-	tracks = { normalTracks = tracks, currentTrack = { Index = prop(0) } },
+	tracks = {
+		normalTracks = tracks,
+		currentTrack = { Index = prop(0) },
+		SizeNormalTracks = function()
+			return normalTrackCount
+		end,
+	},
 	sequencer = sequencer,
 	commandManager = commandManager,
 	force = force,
@@ -310,6 +317,9 @@ M.dev = dev
 M.aperture = aperture
 M.clipProperties = clipProperties
 M.tracks = tracks
+function M.setNormalTrackCount(n)
+	normalTrackCount = n
+end
 M.sequencer = sequencer
 M.commandManager = commandManager
 M.force = force

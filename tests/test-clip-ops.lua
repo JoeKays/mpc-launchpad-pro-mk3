@@ -33,7 +33,7 @@ assert_eq(mock.find("DeleteClip")[2].args[2], 7, "second DeleteClip row")
 
 -- Releasing clear disarms it: the next pad must not delete.
 L.HandleMIDICC(0, 60, 0)
-assert_eq(mock.leds[60][1], 12, "clear button dim after release")
+assert_eq(mock.leds[60][1], 127, "clear button available after release")
 L.HandleMIDINoteOn(0, 13, 100)
 assert_eq(mock.count("DeleteClip"), 2, "released clear does not delete")
 

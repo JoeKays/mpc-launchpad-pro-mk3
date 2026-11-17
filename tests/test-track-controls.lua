@@ -29,6 +29,13 @@ end
 
 L.OnLoad()
 
+-- Mapped function buttons CC 1-6 and CC 8 are available (lighter); CC 7 is off.
+for cc = 1, 6 do
+	assert_eq(mock.leds[cc][1], 60, "function button " .. cc .. " available")
+end
+assert_eq(mock.leds[7][1], 0, "device button off")
+assert_eq(mock.leds[8][1], 60, "stopClip button available")
+
 -- Volume menu: press CC 4.
 L.HandleMIDICC(0, 4, 127)
 -- The volume button is white.
@@ -112,6 +119,16 @@ L.HandleMIDICC(0, 92, 127) -- MoveRight(1)
 L.HandleMIDICC(0, 4, 127) -- volume menu
 L.HandleMIDINoteOn(0, 81, 100) -- grid column 0, top row
 assert_near(mock.tracks[1].Volume.value, db_gain(6), "volume after scroll")
+
+-- Empty tracks beyond SizeNormalTracks stay dark in the fader menus.
+-- After MoveRight(1), grid col 4 = global track 5 (empty), col 3 = track 4.
+mock.setNormalTrackCount(5)
+L.HandleTimer() -- repaint the open volume menu
+assert_eq(mock.leds[15][1], 0, "empty track 5 red")
+assert_eq(mock.leds[15][2], 0, "empty track 5 green")
+assert_eq(mock.leds[15][3], 0, "empty track 5 blue")
+assert_eq(mock.leds[14][2], 127, "track 4 lit")
+mock.setNormalTrackCount(8)
 
 L.OnUnload()
 print("test-track-controls: PASS")

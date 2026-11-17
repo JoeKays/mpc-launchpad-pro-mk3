@@ -34,6 +34,10 @@ and press it again to exit.
 | 7 | device (stub) | tempo (stub) |
 | 8 | stop clip | swing (stub) |
 
+Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or hold CC 8
+and press a clip pad to stop the clips on that pad's track. The clip pad does not launch
+while stop clip is held.
+
 Track row CC 101-108: track 0 = CC 101, ..., track 7 = CC 108. The track index follows
 the grid window: after scrolling right by one, CC 101 controls the track now in the first
 grid column (global track 1), not global track 0. The track buttons show the held
@@ -148,10 +152,10 @@ working.
 - Grid: clip colour, dim when stopped, bright when playing/recording, blink when queued.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
-- Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom.
-- Function buttons (CC 1-8): the held one white, others dim (including device and stop clip).
+- Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
+- Function buttons (CC 1-8): three states — off when the function is unavailable (e.g. device), a lighter grey when available, white when held/selected.
 - Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording; duplicate/clear white while held; up/down cyan while a fader menu is open.
+- Left column: play green while playing, record red while recording; duplicate/clear white while available; up/down white while available and cyan while a fader menu is open. Fixed length and quantize are stubs and stay off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),

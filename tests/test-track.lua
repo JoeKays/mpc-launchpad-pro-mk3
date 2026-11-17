@@ -46,7 +46,15 @@ L.HandleMIDICC(0, 104, 127)
 assert_eq(mock.count("StopClipsOnTrack"), 1, "StopClipsOnTrack")
 assert_eq(mock.find("StopClipsOnTrack")[1].args[1], 3, "track 3")
 L.HandleMIDICC(0, 8, 0)
-assert_eq(mock.leds[8][1], 12, "stopClip button dim after release")
+assert_eq(mock.leds[8][1], 60, "stopClip button available after release")
+
+-- hold stop clip + clip pad stops that track's clips (does not trigger)
+L.HandleMIDICC(0, 8, 127)
+L.HandleMIDINoteOn(0, 11, 100) -- col 0, bottom row
+assert_eq(mock.count("StopClipsOnTrack"), 2, "stop clip pad -> StopClipsOnTrack")
+assert_eq(mock.find("StopClipsOnTrack")[2].args[1], 0, "stop clip pad track 0")
+assert_eq(mock.count("TriggerClip"), 0, "stop clip pad does not trigger")
+L.HandleMIDICC(0, 8, 0)
 
 -- track select without a held function
 L.HandleMIDICC(0, 101, 127)

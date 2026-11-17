@@ -107,6 +107,7 @@ local S = {
 local C = {
 	off = { 0, 0, 0 },
 	dim = { 12, 12, 12 },
+	available = { 60, 60, 60 },
 	white = { 127, 127, 127 },
 	green = { 0, 127, 0 },
 	red = { 127, 0, 0 },
@@ -408,10 +409,11 @@ local function paintAdjustGrid()
 		colour = SEND_COLOURS[adjustSend] or C.yellow
 	end
 	local name = adjustPropName()
+	local trackCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or GRID_COLS
 	for col = 0, GRID_COLS - 1 do
 		local gc = globalPos(col, 0)
 		local t = trackAt(gc)
-		if t then
+		if t and gc < trackCount then
 			local litCount
 			if adjustMode == "volume" then
 				-- dB fader: -inf = no pads, +6 dB = all 8 pads
@@ -495,11 +497,21 @@ end
 
 local function paintTrack()
 	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
+	local function fnAvailable(fn)
+		if fn == "device" then
+			return false -- stub, no device page yet
+		elseif fn == "stopClip" then
+			return aperture ~= nil and aperture.StopClipsOnTrack ~= nil
+		end
+		return mpc.tracks ~= nil
+	end
 	local function fnColour(fn)
 		if heldFunction == fn or adjustMode == fn then
 			return C.white
+		elseif fnAvailable(fn) then
+			return C.available
 		else
-			return C.dim
+			return C.off
 		end
 	end
 	local arm = fnColour("recArm")
@@ -594,34 +606,34 @@ local function paintLeft()
 		playing and C.green[3] or C.dim[3]
 	)
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
-	ledRGB(LEFT.fixedLength, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(LEFT.quantize, C.dim[1], C.dim[2], C.dim[3])
+	ledOff(LEFT.fixedLength)
+	ledOff(LEFT.quantize)
 	local dupOn = clipOp == "duplicate"
 	local clearOn = clipOp == "clear"
 	local nudgeOn = adjustMode ~= nil
 	ledRGB(
 		LEFT.duplicate,
-		dupOn and C.white[1] or C.dim[1],
-		dupOn and C.white[2] or C.dim[2],
-		dupOn and C.white[3] or C.dim[3]
+		dupOn and C.white[1] or C.white[1],
+		dupOn and C.white[2] or C.white[2],
+		dupOn and C.white[3] or C.white[3]
 	)
 	ledRGB(
 		LEFT.clear,
-		clearOn and C.white[1] or C.dim[1],
-		clearOn and C.white[2] or C.dim[2],
-		clearOn and C.white[3] or C.dim[3]
+		clearOn and C.white[1] or C.white[1],
+		clearOn and C.white[2] or C.white[2],
+		clearOn and C.white[3] or C.white[3]
 	)
 	ledRGB(
 		LEFT.down,
-		nudgeOn and C.cyan[1] or C.dim[1],
-		nudgeOn and C.cyan[2] or C.dim[2],
-		nudgeOn and C.cyan[3] or C.dim[3]
+		nudgeOn and C.cyan[1] or C.white[1],
+		nudgeOn and C.cyan[2] or C.white[2],
+		nudgeOn and C.cyan[3] or C.white[3]
 	)
 	ledRGB(
 		LEFT.up,
-		nudgeOn and C.cyan[1] or C.dim[1],
-		nudgeOn and C.cyan[2] or C.dim[2],
-		nudgeOn and C.cyan[3] or C.dim[3]
+		nudgeOn and C.cyan[1] or C.white[1],
+		nudgeOn and C.cyan[2] or C.white[2],
+		nudgeOn and C.cyan[3] or C.white[3]
 	)
 end
 
@@ -1050,7 +1062,12 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	local col, row = noteIndex(note)
 	if col then
 		if velocity > 0 then
-			if clipOp == "clear" then
+			if heldFunction == "stopClip" then
+				local gc = globalPos(col, 0)
+				call(aperture and aperture.StopClipsOnTrack, gc)
+				log("StopClipsOnTrack(" .. gc .. ")")
+				paintAll()
+			elseif clipOp == "clear" then
 				local gc, gr = globalPos(col, row)
 				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, gc, gr)
 				log(string.format("DeleteClip(%d,%d)", gc, gr))
