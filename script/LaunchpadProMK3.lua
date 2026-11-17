@@ -744,15 +744,20 @@ local function qlinkColour(i)
 end
 
 -- Columns show only the ASSIGNED Q-Links, compacted left-to-right with no gaps
--- (unassigned slots would leave dark columns in between). Page 1 = the first 8
--- assigned Q-Links, page 2 = the rest; the list is rebuilt on every paint.
+-- (unassigned slots would leave dark columns in between). The order follows the
+-- MPC's Q-Link screen, which lists the 16 slots column-major: its page 1 is Q-Links
+-- 0,4,8,12, page 2 is 1,5,9,13, page 3 is 2,6,10,14, page 4 is 3,7,11,15. Raw index
+-- order interleaves the MPC's pages (device-verified: a user's Kill EQ page lived at
+-- 0,4,8,12 and the Beat Repeat page at 1,5,9,13). Page 1 of the Launchpad grid shows
+-- the first 8 assigned Q-Links in this order, page 2 the rest.
+local QLINK_DISPLAY_ORDER = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 }
 local qlinkColumnMap = {}
 
 local function buildQlinkColumnMap()
 	qlinkColumnMap = {}
 	local count = qlinkCount()
-	for i = 0, count - 1 do
-		if qlinkAssigned(i) then
+	for _, i in ipairs(QLINK_DISPLAY_ORDER) do
+		if i < count and qlinkAssigned(i) then
 			qlinkColumnMap[#qlinkColumnMap + 1] = i
 		end
 	end

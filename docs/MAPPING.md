@@ -165,8 +165,12 @@ but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMIT
 All 16 Q-Links are reachable, **compacted**: only the assigned Q-Links (non-empty
 target name) get columns, packed left-to-right with no dark gaps between faders; the
 page-open log line lists the map (`qlink page (N assigned): 1=name, 2=name, ...`).
-Page 1 = the first 8 assigned Q-Links, page 2 = the rest; tapping Device cycles
-page 1 -> page 2 -> exit (a page-2 tap is skipped when 8 or fewer are assigned).
+The column order follows the MPC's Q-Link screen, which lists the 16 slots
+**column-major** (its page 1 = Q-Links 0,4,8,12; page 2 = 1,5,9,13; page 3 =
+2,6,10,14; page 4 = 3,7,11,15) — raw index order would interleave the MPC's pages.
+Launchpad page 1 = the first 8 assigned Q-Links in that order, page 2 = the rest;
+tapping Device cycles page 1 -> page 2 -> exit (page 2 is skipped when 8 or fewer
+are assigned).
 Each fader keeps its MPC Q-Link bank colour — bank 1 (Q-Links 0-3) cyan, bank 2
 (4-7) magenta, bank 3 (8-11) yellow, bank 4 (12-15) blue — so the grouping stays
 visible after compaction.
