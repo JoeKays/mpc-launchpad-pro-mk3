@@ -75,6 +75,7 @@ MPC action mapping (phase 1 clip mode first):
 - 20 play: `IsPlaying` ? `Stop` : `Play`; 10 record: `Record`; 40 quantize / 50 duplicate / 60 clear: stubs.
 - Track row CC 101-108: `SelectTrack(globalPos(col,0))`; hold a function button (CC 1-8) then press a track button to apply it to that track.
 - Function buttons CC 1-8: record arm/mute/solo/volume/pan/sends/device/stop clip; Shift variants undo/redo/click/tap tempo/tempo/swing.
+- CC 7 (device): Q-Link page — grid shows Q-Links 0-7 as faders, press a pad to set the position, up/down switch to Q-Links 8-15, Shift+up/down nudge by 1; press again to exit.
 - 89/79/69 (Shift): clip/step/track modes; 59/49/39/29/19 (Shift): later phases (stub).
 - 99 novation logo: status/home; Shift = probe mode.
 - Track volume/pan/sends: hold CC 4/5/6 + a track button, then use grid rows / up-down to adjust (see docs/MAPPING.md).

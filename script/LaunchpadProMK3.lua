@@ -145,6 +145,9 @@ local clipOrigin = nil -- {col, row} for duplicate
 local tempoMode = false -- Shift+CC7 tempo page: up/down change BPM
 local tempoHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
 local tempoHoldTicks = 0 -- ticks since the tempo button was pressed
+local qlinkMode = false -- CC7 device page: Q-Link faders
+local qlinkPage = 0 -- 0 = Q-Links 0-7, 1 = Q-Links 8-15
+local qlinkCol = 0 -- last grid column touched (for up/down nudges)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
@@ -560,9 +563,120 @@ local function paintAdjustGrid()
 	end
 end
 
+-----------------------------------------------------------------------------------------------
+-- Q-Link page (CC 7 device)
+-----------------------------------------------------------------------------------------------
+
+local paintAll -- forward declaration (defined below)
+
+local function qlinkAt(i)
+	local cs = mpc.controlSurface
+	local ql = cs and cs.qlinks
+	if not ql then
+		return nil
+	end
+	return ql[i]
+end
+
+local function qlinkCount()
+	local cs = mpc.controlSurface
+	local ql = cs and cs.qlinks
+	if not ql then
+		return 0
+	end
+	return call(ql.GetNumQLinks) or 0
+end
+
+local function qlinkPosition(i)
+	local q = qlinkAt(i)
+	if not q then
+		return 0
+	end
+	return call(q.GetPosition) or 0
+end
+
+local function setQlinkPosition(i, pos)
+	local q = qlinkAt(i)
+	if not q then
+		return
+	end
+	call(q.SetPosition, pos)
+end
+
+local function qlinkValueString(i)
+	local q = qlinkAt(i)
+	if not q then
+		return ""
+	end
+	return tostring(call(q.GetValueString) or "")
+end
+
+local function paintQlinkGrid()
+	local count = qlinkCount()
+	for col = 0, GRID_COLS - 1 do
+		local i = qlinkPage * GRID_COLS + col
+		local pos = (i < count) and qlinkPosition(i) or 0
+		local litCount = math.floor(pos / 127 * GRID_ROWS + 0.5)
+		for row = 0, GRID_ROWS - 1 do
+			local idx = 10 * (8 - row) + col + 1
+			local fromBottom = 7 - row
+			if i < count and fromBottom < litCount then
+				ledRGB(idx, C.cyan[1], C.cyan[2], C.cyan[3])
+			else
+				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+			end
+		end
+	end
+end
+
+local function handleQlinkPad(col, row)
+	local i = qlinkPage * GRID_COLS + col
+	local count = qlinkCount()
+	if i >= count then
+		return
+	end
+	local pos = math.floor((GRID_ROWS - row) / GRID_ROWS * 127 + 0.5)
+	setQlinkPosition(i, pos)
+	qlinkCol = col
+	log(string.format("qlink %d = %d (%s)", i, pos, qlinkValueString(i)))
+	paintAll()
+end
+
+local function nudgeQlink(delta)
+	local i = qlinkPage * GRID_COLS + qlinkCol
+	local count = qlinkCount()
+	if i >= count then
+		return
+	end
+	local pos = math.max(0, math.min(127, qlinkPosition(i) + delta))
+	setQlinkPosition(i, pos)
+	log(string.format("qlink %d = %d (%s)", i, pos, qlinkValueString(i)))
+	paintAll()
+end
+
+local function enterQlink()
+	adjustMode = nil
+	tempoMode = false
+	qlinkMode = true
+	qlinkPage = 0
+	qlinkCol = 0
+	log("qlink page")
+	paintAll()
+end
+
+local function exitQlink()
+	qlinkMode = false
+	log("qlink page off")
+	paintAll()
+end
+
 local function paintGrid()
 	if tempoMode then
 		paintTempoGrid()
+		return
+	end
+	if qlinkMode then
+		paintQlinkGrid()
 		return
 	end
 	if adjustMode then
@@ -618,14 +732,15 @@ local function paintTrack()
 	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
 	local function fnAvailable(fn)
 		if fn == "device" then
-			return mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil
+			local cs = mpc.controlSurface
+			return (cs and cs.qlinks ~= nil) or (mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil)
 		elseif fn == "stopClip" then
 			return aperture ~= nil and aperture.StopClipsOnTrack ~= nil
 		end
 		return mpc.tracks ~= nil
 	end
 	local function fnColour(fn)
-		if heldFunction == fn or adjustMode == fn or (fn == "device" and tempoMode) then
+		if heldFunction == fn or adjustMode == fn or (fn == "device" and (tempoMode or qlinkMode)) then
 			return C.white
 		elseif fnAvailable(fn) then
 			return C.available
@@ -727,8 +842,8 @@ local function paintLeft()
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
 	ledOff(LEFT.fixedLength)
 	ledOff(LEFT.quantize)
-	local nudgeOn = adjustMode ~= nil or tempoMode
-	local pageColour = tempoMode and C.white or adjustColour()
+	local nudgeOn = adjustMode ~= nil or tempoMode or qlinkMode
+	local pageColour = tempoMode and C.white or (qlinkMode and C.cyan or adjustColour())
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -756,7 +871,7 @@ local function paintRight()
 	)
 end
 
-local function paintAll()
+paintAll = function()
 	paintGrid()
 	paintScene()
 	paintTrack()
@@ -1027,6 +1142,7 @@ end
 
 local function enterAdjust(newMode)
 	tempoMode = false
+	qlinkMode = false
 	adjustMode = newMode
 	adjustCol = 0
 	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
@@ -1151,6 +1267,7 @@ local function doShiftFunction(fn)
 		doTapTempo()
 	elseif fn == "device" then
 		adjustMode = nil
+		qlinkMode = false
 		tempoMode = not tempoMode
 		tempoHold = nil
 		if tempoMode then
@@ -1259,6 +1376,8 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 				end
 			elseif adjustMode then
 				handleAdjustPad(col, row)
+			elseif qlinkMode then
+				handleQlinkPad(col, row)
 			elseif not tempoMode then
 				doClip(col, row)
 			end
@@ -1359,6 +1478,16 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		nudgeAdjust(cc == LEFT.up and 1 / 8 or -1 / 8)
 		return
 	end
+	if qlinkMode and (cc == LEFT.up or cc == LEFT.down) then
+		if shift then
+			nudgeQlink(cc == LEFT.up and 1 or -1)
+		else
+			qlinkPage = (qlinkPage == 0) and 1 or 0
+			log("qlink bank " .. (qlinkPage + 1))
+			paintAll()
+		end
+		return
+	end
 	if cc == LEFT.up then
 		moveWindow("up", shift and 8 or 1)
 		return
@@ -1416,6 +1545,12 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 				exitAdjust()
 			else
 				enterAdjust(fn)
+			end
+		elseif fn == "device" then
+			if qlinkMode then
+				exitQlink()
+			else
+				enterQlink()
 			end
 		else
 			heldFunction = fn
@@ -1513,6 +1648,8 @@ end
 function LaunchpadProMK3.OnLoad()
 	adjustMode = nil
 	adjustSend = 1
+	qlinkMode = false
+	tempoMode = false
 	clipOp = nil
 	clipOrigin = nil
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
@@ -1607,6 +1744,8 @@ function LaunchpadProMK3.OnUnload()
 	removeListeners()
 	adjustMode = nil
 	adjustSend = 1
+	qlinkMode = false
+	tempoMode = false
 	clipOp = nil
 	clipOrigin = nil
 	if programmerEntered then

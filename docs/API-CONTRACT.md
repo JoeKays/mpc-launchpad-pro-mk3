@@ -109,7 +109,7 @@ One control per Force button: `arp assignA assignB clip clipStop copy crossfader
 ## 9. mpc.controlSurface
 
 - `pads` — 1-based indices 1-64: `Tap(idx, vel)`, `Press(idx, vel)` / `Release(idx)` (Press carries velocity; Tap may ignore it — FL.lua:718-731), `IsPressedVirtual`, `LightRGBColor(idx)` → hex string, `LightBrightness(idx)`, `Colour` per-pad property, `CurrentBank` prop, `LastHitPad()` (1-based, base confirmed empirically FL.lua:803-809), `EnsurePadVisible`. Mapping fns live under `dev.mappings.pads`: `AddNoteToMpcPad(ch,note,pad≤15)`, `AddNoteToForcePad(≤63)`, `AddNoteToVirtualPad(ch,note,pad≤127)`, `Remove*`, `Is*Mapped`. (FINDINGS 20, 18; FL.lua:632-668, 1392.)
-- `qlinks` — `GetNumQLinks()`; `qlinks[i]` (0-based) with `TargetName` (str prop, listenable), `ValueString` (str prop, listenable), `GetPosition()` (0-127 **but lags one change**), `SetPosition`, `IsTouched`, `Rotate(delta)` (wraps at ends; cap steps). Mapping via `dev.mappings.controlSurface.qlinks` or `dev.mappings.control` : `AddInfiniteCCToQLink(ch, cc, qlink)` (cc 1-63 = cw, 64-127 = ccw), `RemoveInfiniteCCToQLink`, `SetQLinkFineAdjust(bool)`. Bank changes update all 16 at once (FINDINGS 26). **NOT in phase 1.**
+- `qlinks` — `GetNumQLinks()`; `qlinks[i]` (0-based) with `TargetName` (str prop, listenable), `ValueString` (str prop, listenable), `GetPosition()` (0-127 **but lags one change**), `SetPosition`, `IsTouched`, `Rotate(delta)` (wraps at ends; cap steps). Mapping via `dev.mappings.controlSurface.qlinks` or `dev.mappings.control` : `AddInfiniteCCToQLink(ch, cc, qlink)` (cc 1-63 = cw, 64-127 = ccw), `RemoveInfiniteCCToQLink`, `SetQLinkFineAdjust(bool)`. Bank changes update all 16 at once (FINDINGS 26). **Implemented** as the CC 7 Q-Link page: `GetPosition()`/`SetPosition()` on `qlinks[0..15]`, 8 per bank.
 - `stepSequencer` — `Tap/Press/Release/IsPressed/LightRGBColour/LightBrightness/GetCurrentMode/Help` (FL.lua:1145-1154; FINDINGS 18). Later phases.
 - `padPerform` / `keyboardControl` — only the two hardware buttons; **scale/root invisible** (FINDINGS 29).
 
@@ -136,7 +136,7 @@ One control per Force button: `arp assignA assignB clip clipStop copy crossfader
 1. **No state dump**: `#GetState` / `mpc.GetState` nil in scripts (FINDINGS 19, 25; LIMS).
 2. **No per-track MIDI input**: no input port/channel/monitor on `normalTracks[i]`; the `mpc.tracks.Get*` getters error (FINDINGS 33).
 3. **Cannot drive a non-current track**: `aperture.SelectTrack` moves MPC's current track; note editing only on `selectedClip` (FINDINGS 33).
-4. `qlinks.GetPosition()` lags one change (FINDINGS 26) — n/a now, keep for later.
+4. `qlinks.GetPosition()` lags one change (FINDINGS 26) — the Q-Link page reads it each repaint; a one-change lag is acceptable for a fader display.
 5. Q-link bank changes update all 16 at once (FINDINGS 26).
 6. **No LED state for `mpc.force.*`** (FINDINGS 30).
 7. Pad-perform scale/root invisible (FINDINGS 29).
