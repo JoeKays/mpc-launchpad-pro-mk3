@@ -28,7 +28,8 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
 | **Save/quantize/duplicate/clear** | Stubbed with `TODO` logs. |
-| **Swing/tap tempo/tempo** | Stubbed with `TODO` logs. |
+| **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |
+| **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome; Shift + CC 6/7/8 = tap tempo/tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
 | **CC 30 (fixed length)** | Registered, but absent from the learn artifact; may not arrive. |
 | **LPP3 mode** | The script enters Programmer mode automatically (layout query + select 0x11) and restores the prior layout on unload. |
@@ -38,6 +39,6 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 
 - Missing aperture → clip surface disabled, transport/track row/function buttons continue.
 - Missing clipProperties → grid dark, clip launch still works via `mpc.clipMatrix`.
-- Missing sequencer → transport buttons inert, no crash.
-- Missing commandManager → undo/redo inert, no crash.
+- Missing sequencer → transport buttons and Shift + CC 3 metronome inert, no crash.
+- Missing commandManager → Shift + CC 1/2 undo/redo inert, no crash.
 - Every optional API is behind `pcall`/nil checks; failures log once and continue.

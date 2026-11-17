@@ -665,18 +665,34 @@ local function selectTrack(idx)
 end
 
 -- Shift + a function button: the shift function (undo/redo/click/tap/tempo/swing).
+-- Shift is checked before the held-function state, so these run even while another
+-- function button is held; the held function is left untouched.
 local function doShiftFunction(fn)
 	if fn == "recArm" then
-		call(mpc.commandManager and mpc.commandManager.Undo)
-		log("Undo")
+		local cm = mpc.commandManager
+		if cm and type(cm.Undo) == "function" then
+			call(cm.Undo)
+			log("Undo")
+		else
+			logOnce("undo", "Undo unavailable: commandManager.Undo missing")
+		end
 	elseif fn == "mute" then
-		call(mpc.commandManager and mpc.commandManager.Redo)
-		log("Redo")
+		local cm = mpc.commandManager
+		if cm and type(cm.Redo) == "function" then
+			call(cm.Redo)
+			log("Redo")
+		else
+			logOnce("redo", "Redo unavailable: commandManager.Redo missing")
+		end
 	elseif fn == "solo" then
 		local sq = mpc.sequencer
 		local me = propValue(sq, "MetronomeEnabled")
-		call(sq and sq.SetMetronomeEnabled, not me)
-		log("Metronome " .. tostring(not me))
+		if sq and type(sq.SetMetronomeEnabled) == "function" then
+			call(sq.SetMetronomeEnabled, not me)
+			log("Metronome " .. tostring(not me))
+		else
+			logOnce("metronome", "metronome unavailable: sequencer.SetMetronomeEnabled missing")
+		end
 	elseif fn == "sends" then
 		log("tap tempo: TODO")
 	elseif fn == "device" then
@@ -791,7 +807,9 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			flushLEDs()
 		end
 		local fn = TRACK_FN[cc]
-		if fn then
+		-- only the button that is actually held clears the hold; releasing a
+		-- shift-function button must not drop a function held from before Shift
+		if fn and fn == heldFunction then
 			heldFunction = nil
 			paintTrack()
 			flushLEDs()
