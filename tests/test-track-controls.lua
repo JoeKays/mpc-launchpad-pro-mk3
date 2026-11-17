@@ -55,16 +55,20 @@ assert_near(mock.tracks[1].Pan.value, 4 / 8, "pan row 4 = 0.5")
 -- Up nudges +1/8.
 L.HandleMIDICC(0, 80, 127)
 assert_near(mock.tracks[1].Pan.value, 5 / 8, "pan up 1/8")
+-- Double-tap the bottom pad (note 12) to reach the true minimum 0.0.
+L.HandleMIDINoteOn(0, 12, 100)
+assert_near(mock.tracks[1].Pan.value, 1 / 8, "pan bottom row = 1/8")
+L.HandleTimer()
+L.HandleMIDINoteOn(0, 12, 100)
+assert_near(mock.tracks[1].Pan.value, 0.0, "pan double-tap bottom = 0.0")
 
 -- Sends menu: press CC 6.
 L.HandleMIDICC(0, 6, 127)
 -- Grid pad col 2, top row (note 83) -> track 2 send 1 = 1.0.
 L.HandleMIDINoteOn(0, 83, 100)
 assert_near(mock.tracks[2].Send1.value, 1.0, "send 1 = 1.0")
--- Shift + CC 6 cycles to send 2.
-L.HandleMIDICC(0, 90, 127)
+-- Tapping CC 6 again cycles to send 2.
 L.HandleMIDICC(0, 6, 127)
-L.HandleMIDICC(0, 90, 0)
 -- Grid pad col 2, row 3 (note 53) -> track 2 send 2 = 5/8.
 L.HandleMIDINoteOn(0, 53, 100)
 assert_near(mock.tracks[2].Send2.value, 5 / 8, "send 2 = 5/8")
@@ -72,8 +76,9 @@ assert_near(mock.tracks[2].Send2.value, 5 / 8, "send 2 = 5/8")
 L.HandleMIDICC(0, 80, 127)
 assert_near(mock.tracks[2].Send2.value, 6 / 8, "send 2 up 1/8")
 
--- Exit the menu: press CC 6 again.
-L.HandleMIDICC(0, 6, 127)
+-- Exit the menu: press pan (CC 5) to switch, then pan again to exit.
+L.HandleMIDICC(0, 5, 127)
+L.HandleMIDICC(0, 5, 127)
 -- A grid pad now launches a clip again.
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch after exit")

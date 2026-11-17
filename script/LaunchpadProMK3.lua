@@ -131,6 +131,7 @@ local heldFunction = nil
 local adjustMode = nil -- nil / "volume" / "pan" / "sends" (menu mode)
 local adjustSend = 1 -- 1..4, the active send in sends mode
 local adjustCol = 0 -- last grid column touched in the menu (for up/down nudges)
+local lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 local clipOp = nil -- nil / "duplicate" / "clear"
 local clipOrigin = nil -- {col, row} for duplicate
 local priorLayout, priorPage = nil, nil
@@ -782,6 +783,7 @@ end
 local function enterAdjust(newMode)
 	adjustMode = newMode
 	adjustCol = 0
+	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 	if newMode == "sends" then
 		adjustSend = 1
 	end
@@ -792,6 +794,7 @@ end
 local function exitAdjust()
 	if adjustMode then
 		adjustMode = nil
+		lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 		log("menu off")
 		paintAll()
 	end
@@ -802,6 +805,13 @@ local function handleAdjustPad(col, row)
 		return
 	end
 	local value = (GRID_ROWS - row) / GRID_ROWS
+	-- double-tapping the bottom pad reaches the true minimum (0.0)
+	if col == lastPadCol and row == lastPadRow and ticks - lastPadTick <= 2 then
+		if row == GRID_ROWS - 1 then
+			value = 0
+		end
+	end
+	lastPadCol, lastPadRow, lastPadTick = col, row, ticks
 	adjustCol = col
 	local gc = globalPos(col, 0)
 	local name = adjustPropName()
@@ -920,18 +930,19 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	if col then
 		if velocity > 0 then
 			if clipOp == "clear" then
-				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, col, row)
-				log(string.format("DeleteClip(%d,%d)", col, row))
-				clipOp = nil
+				local apiRow = 7 - row
+				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, col, apiRow)
+				log(string.format("DeleteClip(%d,%d)", col, apiRow))
 				paintAll()
 			elseif clipOp == "duplicate" then
 				if clipOrigin == nil then
 					clipOrigin = { col, row }
 					log(string.format("duplicate origin (%d,%d)", col, row))
 				else
-					call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], clipOrigin[2], col, row)
-					log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], clipOrigin[2], col, row))
-					clipOp = nil
+					local fromRow = 7 - clipOrigin[2]
+					local toRow = 7 - row
+					call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], fromRow, col, toRow)
+					log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], fromRow, col, toRow))
 					clipOrigin = nil
 					paintAll()
 				end
@@ -1061,16 +1072,18 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	local fn = TRACK_FN[cc]
 	if fn then
 		if shift then
-			if fn == "sends" and adjustMode == "sends" then
+			doShiftFunction(fn)
+			paintTrack()
+			flushLEDs()
+		elseif fn == "sends" then
+			if adjustMode == "sends" then
 				adjustSend = (adjustSend % 4) + 1
 				log("send " .. adjustSend)
 				paintAll()
 			else
-				doShiftFunction(fn)
-				paintTrack()
-				flushLEDs()
+				enterAdjust("sends")
 			end
-		elseif fn == "volume" or fn == "pan" or fn == "sends" then
+		elseif fn == "volume" or fn == "pan" then
 			if adjustMode == fn then
 				exitAdjust()
 			else
