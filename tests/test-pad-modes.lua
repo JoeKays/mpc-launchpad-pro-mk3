@@ -186,11 +186,12 @@ L.HandleMIDICC(0, 80, 127)
 assert_eq(latestVirtual().args[3], 60, "base shifted +12")
 L.HandleMIDICC(0, 70, 127)
 assert_eq(latestVirtual().args[3], 48, "base shifted back")
--- third tap exits back to the clip grid
+-- third tap exits back to the clip grid; leaving chromatic resets the MPC pad bank
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("RemoveNoteToVirtualPad"), 64, "exit unbinds the virtual pads")
 assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
+assert_eq(mock.count("bank1.Press"), 1, "leaving chromatic resets the pad bank")
 assert_eq(mock.leds[94][1], 60, "note button available after exit")
 
 print("test-pad-modes: PASS")

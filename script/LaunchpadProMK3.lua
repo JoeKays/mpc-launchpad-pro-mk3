@@ -1515,6 +1515,16 @@ local function exitPadsMode()
 	end
 	boundPadNotes = {}
 	padsColourCache = {}
+	if padsLayout == "chromatic" then
+		-- virtual pads live beyond the physical 16; using them can leave the MPC's pad
+		-- engine on an out-of-range bank where every track's pads are dark and silent
+		-- (they still show MIDI activity). Return the pad bank to A on the way out.
+		if pressSurfaceButton("bank1") then
+			log("pad bank reset (bank 1)")
+		else
+			logOnce("bankreset", "pad bank reset unavailable: controlSurface.bank1 missing")
+		end
+	end
 	log("pads mode off")
 end
 

@@ -535,6 +535,14 @@ local mpc = {
 				record("save.Release")
 			end,
 		},
+		bank1 = {
+			Press = function()
+				record("bank1.Press")
+			end,
+			Release = function()
+				record("bank1.Release")
+			end,
+		},
 	},
 	ui = {
 		ShowTUIFeedback = function(s)
