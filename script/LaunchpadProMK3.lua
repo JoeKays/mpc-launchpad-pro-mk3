@@ -431,14 +431,14 @@ local SEGMENTS = {
 	["9"] = { a = true, b = true, c = true, d = true, e = false, f = true, g = true },
 }
 
-local function tempoPad(col, row)
+local function tempoPad(col, row, colour)
 	if col >= 0 and col < GRID_COLS and row >= 0 and row < GRID_ROWS then
-		ledRGB(10 * (8 - row) + col + 1, C.white[1], C.white[2], C.white[3])
+		ledRGB(10 * (8 - row) + col + 1, colour[1], colour[2], colour[3])
 	end
 end
 
 -- Draw one 7-segment digit in the box (x0, y0) .. (x0+w-1, y0+h-1).
-local function drawDigit(ch, x0, y0, w, h)
+local function drawDigit(ch, x0, y0, w, h, colour)
 	local seg = SEGMENTS[ch]
 	if not seg then
 		return
@@ -446,37 +446,37 @@ local function drawDigit(ch, x0, y0, w, h)
 	local mid = math.floor(h / 2)
 	if seg.a then
 		for c = 0, w - 1 do
-			tempoPad(x0 + c, y0)
+			tempoPad(x0 + c, y0, colour)
 		end
 	end
 	if seg.d then
 		for c = 0, w - 1 do
-			tempoPad(x0 + c, y0 + h - 1)
+			tempoPad(x0 + c, y0 + h - 1, colour)
 		end
 	end
 	if seg.g then
 		for c = 0, w - 1 do
-			tempoPad(x0 + c, y0 + mid)
+			tempoPad(x0 + c, y0 + mid, colour)
 		end
 	end
 	if seg.f then
 		for r = 0, mid do
-			tempoPad(x0, y0 + r)
+			tempoPad(x0, y0 + r, colour)
 		end
 	end
 	if seg.b then
 		for r = 0, mid do
-			tempoPad(x0 + w - 1, y0 + r)
+			tempoPad(x0 + w - 1, y0 + r, colour)
 		end
 	end
 	if seg.e then
 		for r = mid, h - 1 do
-			tempoPad(x0, y0 + r)
+			tempoPad(x0, y0 + r, colour)
 		end
 	end
 	if seg.c then
 		for r = mid, h - 1 do
-			tempoPad(x0 + w - 1, y0 + r)
+			tempoPad(x0 + w - 1, y0 + r, colour)
 		end
 	end
 end
@@ -505,9 +505,11 @@ local function paintTempoGrid()
 		widths[1] = 4
 		widths[2] = 4
 	end
+	-- colour by position from the right: ones green, tens yellow, hundreds cyan
+	local colours = { C.green, C.yellow, C.cyan }
 	local x0 = 0
 	for i = 1, #text do
-		drawDigit(text:sub(i, i), x0, 0, widths[i], GRID_ROWS)
+		drawDigit(text:sub(i, i), x0, 0, widths[i], GRID_ROWS, colours[#text - i + 1])
 		x0 = x0 + widths[i]
 	end
 end

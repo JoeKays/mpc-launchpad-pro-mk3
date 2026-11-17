@@ -58,7 +58,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 4 | — | — |
 | 5 | — | — |
 | 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
-| 7 | tempo page (Shift) | toggles the tempo page; the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), up/down change BPM (hold accelerates) |
+| 7 | tempo page (Shift) | toggles the tempo page; the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones green, tens yellow, hundreds cyan); up/down change BPM (hold accelerates) |
 | 8 | swing (stub) | logs `swing: TODO` |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
