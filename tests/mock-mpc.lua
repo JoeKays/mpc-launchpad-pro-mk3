@@ -489,20 +489,20 @@ local mpc = {
 				record("quantizeApply.Release")
 			end,
 		},
-		keyboardControl = {
+		noteRepeat = {
 			Press = function()
-				record("keyboardControl.Press")
+				record("noteRepeat.Press")
 			end,
 			Release = function()
-				record("keyboardControl.Release")
+				record("noteRepeat.Release")
 			end,
 		},
-		chord = {
+		fullLevel = {
 			Press = function()
-				record("chord.Press")
+				record("fullLevel.Press")
 			end,
 			Release = function()
-				record("chord.Release")
+				record("fullLevel.Release")
 			end,
 		},
 		stepSeq = {

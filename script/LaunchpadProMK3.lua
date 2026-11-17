@@ -157,7 +157,7 @@ local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
 local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
-local padUtility = "off" -- CC 95 cycles the MPC's own pad modes: keyboard -> chord -> off
+local padUtility = "off" -- CC 95 cycles the MPC's pad utilities: note repeat -> full level -> off
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
@@ -1408,9 +1408,11 @@ local function padsModeNote(i)
 end
 
 -- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
--- The MPC's own pad modes (chromatic keyboard, chords) are toggled by pressing the
--- control-surface buttons; CC 95 cycles them while MPC Pads mode owns the grid.
-local PAD_UTILITY_BUTTONS = { keyboard = "keyboardControl", chord = "chord" }
+-- The MPC's pad utilities are toggled by pressing the control-surface buttons; CC 95
+-- cycles them while MPC Pads mode owns the grid. keyboardControl is deliberately NOT
+-- in the cycle: it opens the MPC's Keyboard page (on-screen keyboard + settings)
+-- rather than silently toggling a pad mode.
+local PAD_UTILITY_BUTTONS = { noteRepeat = "noteRepeat", fullLevel = "fullLevel" }
 
 local function pressSurfaceButton(name)
 	local b = mpc.controlSurface and mpc.controlSurface[name]
@@ -1424,7 +1426,7 @@ end
 
 padUtilityAvailable = function()
 	local cs = mpc.controlSurface
-	if not (cs and cs.keyboardControl and cs.chord) then
+	if not (cs and cs.noteRepeat and cs.fullLevel) then
 		return false
 	end
 	return true
@@ -1447,17 +1449,17 @@ local function cyclePadUtility()
 		return
 	end
 	if padUtility == "off" then
-		pressSurfaceButton("keyboardControl")
-		padUtility = "keyboard"
-	elseif padUtility == "keyboard" then
-		pressSurfaceButton("keyboardControl") -- off
-		pressSurfaceButton("chord")
-		padUtility = "chord"
+		pressSurfaceButton("noteRepeat")
+		padUtility = "noteRepeat"
+	elseif padUtility == "noteRepeat" then
+		pressSurfaceButton("noteRepeat") -- off
+		pressSurfaceButton("fullLevel")
+		padUtility = "fullLevel"
 	else
-		pressSurfaceButton("chord") -- off
+		pressSurfaceButton("fullLevel") -- off
 		padUtility = "off"
 	end
-	log("pad mode: " .. padUtility)
+	log("pad utility: " .. padUtility)
 	paintTop()
 	flushLEDs()
 end

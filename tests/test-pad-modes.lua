@@ -136,33 +136,31 @@ L.OnUnload()
 assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "unload exits pads mode")
 assert_eq(mock.count("AddNoteToScript"), 16, "unload restores the notes")
 
--- CC 95 cycles the MPC's own pad modes while MPC Pads mode is open: off -> keyboard -> chord -> off.
-mock.reset()
-L.HandleMIDINoteOn(0, 94, 127) -- pads not open yet (notes are the router)... use CC
+-- CC 95 cycles the MPC's pad utilities while MPC Pads mode is open: off -> note repeat -> full level -> off.
 mock.reset()
 L.HandleMIDICC(0, 94, 127) -- enter pads mode
-L.HandleMIDICC(0, 95, 127) -- cycle: keyboard on
-assert_eq(mock.count("keyboardControl.Press"), 1, "keyboardControl pressed")
-assert_eq(mock.leds[95][1], 127, "chord button white while keyboard mode on")
-L.HandleMIDICC(0, 95, 127) -- cycle: keyboard off, chord on
-assert_eq(mock.count("keyboardControl.Press"), 2, "keyboardControl toggled off")
-assert_eq(mock.count("chord.Press"), 1, "chord pressed")
-L.HandleMIDICC(0, 95, 127) -- cycle: chord off
-assert_eq(mock.count("chord.Press"), 2, "chord toggled off")
+L.HandleMIDICC(0, 95, 127) -- cycle: note repeat on
+assert_eq(mock.count("noteRepeat.Press"), 1, "noteRepeat pressed")
+assert_eq(mock.leds[95][1], 127, "chord button white while note repeat on")
+L.HandleMIDICC(0, 95, 127) -- cycle: note repeat off, full level on
+assert_eq(mock.count("noteRepeat.Press"), 2, "noteRepeat toggled off")
+assert_eq(mock.count("fullLevel.Press"), 1, "fullLevel pressed")
+L.HandleMIDICC(0, 95, 127) -- cycle: full level off
+assert_eq(mock.count("fullLevel.Press"), 2, "fullLevel toggled off")
 assert_eq(mock.leds[95] and mock.leds[95][1] or 0, 60, "chord button back to available")
 
 -- Exiting pads mode (CC 93 session) clears the active utility and returns to the clip grid.
 mock.reset()
-L.HandleMIDICC(0, 95, 127) -- keyboard on again
-assert_eq(mock.count("keyboardControl.Press"), 1, "keyboard on")
+L.HandleMIDICC(0, 95, 127) -- note repeat on again
+assert_eq(mock.count("noteRepeat.Press"), 1, "note repeat on")
 L.HandleMIDICC(0, 93, 127) -- session -> clip mode
 assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "session exits pads mode")
-assert_eq(mock.count("keyboardControl.Press"), 2, "utility cleared on exit")
+assert_eq(mock.count("noteRepeat.Press"), 2, "utility cleared on exit")
 assert_eq(mock.leds[95] and mock.leds[95][1] or 0, 0, "chord button off outside pads mode")
 
 -- Outside pads mode the cycle is a no-op with a log.
 mock.reset()
 L.HandleMIDICC(0, 95, 127)
-assert_eq(mock.count("keyboardControl.Press"), 0, "no pad utility outside pads mode")
+assert_eq(mock.count("noteRepeat.Press"), 0, "no pad utility outside pads mode")
 
 print("test-pad-modes: PASS")
