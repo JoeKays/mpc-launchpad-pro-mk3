@@ -27,29 +27,27 @@ L.HandleMIDICC(0, 4, 127)
 assert_eq(mock.leds[4][1], 127, "volume button red")
 assert_eq(mock.leds[4][2], 127, "volume button green")
 assert_eq(mock.leds[4][3], 127, "volume button blue")
--- Grid pad col 0, top row (note 81) -> track 0 volume 1.0.
+-- Grid pad col 0, top row (note 81) -> track 0 volume +6 dB.
 L.HandleMIDINoteOn(0, 81, 100)
-assert_near(mock.tracks[0].Volume.value, 1.0, "volume top row = 1.0")
+assert_near(mock.tracks[0].VolumeDB.value, 6, "volume top row = +6 dB")
 -- The fader fills from the bottom: the bottom pad (note 11) is lit.
 assert_eq(mock.leds[11][1], 0, "fader bottom red")
 assert_eq(mock.leds[11][2], 127, "fader bottom green")
 assert_eq(mock.leds[11][3], 127, "fader bottom blue")
--- Grid pad col 0, bottom row (note 11) -> track 0 volume 1/8.
+-- Grid pad col 0, bottom row (note 11) -> track 0 volume -inf.
 L.HandleMIDINoteOn(0, 11, 100)
-assert_near(mock.tracks[0].Volume.value, 1 / 8, "volume bottom row = 1/8")
--- Up nudges +1/8.
+assert_near(mock.tracks[0].VolumeDB.value, -100, "volume bottom row = -inf")
+-- Up nudges one dB step: -inf -> -30 dB.
 L.HandleMIDICC(0, 80, 127)
-assert_near(mock.tracks[0].Volume.value, 2 / 8, "volume up 1/8")
--- Down nudges -1/8 and clamps at 0.
+assert_near(mock.tracks[0].VolumeDB.value, -30, "volume up -> -30 dB")
+-- Down nudges back to -inf.
 L.HandleMIDICC(0, 70, 127)
-assert_near(mock.tracks[0].Volume.value, 1 / 8, "volume down 1/8")
-L.HandleMIDICC(0, 70, 127)
-assert_near(mock.tracks[0].Volume.value, 0.0, "volume clamped at 0")
--- Up clamps at 1.
+assert_near(mock.tracks[0].VolumeDB.value, -100, "volume down -> -inf")
+-- Up clamps at +6 dB.
 for _ = 1, 10 do
 	L.HandleMIDICC(0, 80, 127)
 end
-assert_near(mock.tracks[0].Volume.value, 1.0, "volume clamped at 1")
+assert_near(mock.tracks[0].VolumeDB.value, 6, "volume clamped at +6 dB")
 
 -- Pan menu: press CC 5.
 L.HandleMIDICC(0, 5, 127)
@@ -71,8 +69,19 @@ L.HandleMIDICC(0, 6, 127)
 -- Grid pad col 2, top row (note 83) -> track 2 send 1 = 1.0.
 L.HandleMIDINoteOn(0, 83, 100)
 assert_near(mock.tracks[2].Send1.value, 1.0, "send 1 = 1.0")
--- Tapping CC 6 again cycles to send 2.
+-- Send 1 is yellow: the top pad is lit yellow.
+assert_eq(mock.leds[83][1], 127, "send 1 red")
+assert_eq(mock.leds[83][2], 127, "send 1 green")
+assert_eq(mock.leds[83][3], 0, "send 1 blue")
+-- Tapping CC 6 again cycles to send 2, which is green.
 L.HandleMIDICC(0, 6, 127)
+-- Grid pad col 2, row 3 (note 53) -> track 2 send 2 = 5/8.
+L.HandleMIDINoteOn(0, 53, 100)
+assert_near(mock.tracks[2].Send2.value, 5 / 8, "send 2 = 5/8")
+-- Send 2 is green: the bottom pad of col 2 (note 13) is lit green.
+assert_eq(mock.leds[13][1], 0, "send 2 red")
+assert_eq(mock.leds[13][2], 127, "send 2 green")
+assert_eq(mock.leds[13][3], 0, "send 2 blue")
 -- Grid pad col 2, row 3 (note 53) -> track 2 send 2 = 5/8.
 L.HandleMIDINoteOn(0, 53, 100)
 assert_near(mock.tracks[2].Send2.value, 5 / 8, "send 2 = 5/8")
@@ -91,7 +100,7 @@ assert_eq(mock.count("TriggerClip"), 1, "clip launch after exit")
 L.HandleMIDICC(0, 92, 127) -- MoveRight(1)
 L.HandleMIDICC(0, 4, 127) -- volume menu
 L.HandleMIDINoteOn(0, 81, 100) -- grid column 0, top row
-assert_near(mock.tracks[1].Volume.value, 1.0, "volume after scroll")
+assert_near(mock.tracks[1].VolumeDB.value, 6, "volume after scroll")
 
 L.OnUnload()
 print("test-track-controls: PASS")

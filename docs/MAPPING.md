@@ -64,21 +64,29 @@ leaves the surface working.
 
 Press volume (CC 4), pan (CC 5) or sends (CC 6) to open a fader menu. The grid becomes
 a bank of faders aligned with the clip view: each grid column is a track, each row is a
-level. The fader fills from the bottom (row 7 = 0.0) to the top (row 0 = 1.0). Press a
-pad in a column to set that track's value to `(8 - row) / 8`. Press volume or pan again
-to exit the menu; tapping sends cycles send 1-4.
+level. Press a pad in a column to set that track's value. Press volume or pan again to
+exit the menu; tapping sends cycles send 1-4.
+
+Volume uses clean dB steps, bottom (row 7) to top (row 0):
+
+| Row | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+|---|---|---|---|---|---|---|---|---|
+| Volume | -inf | -30 dB | -20 dB | -9 dB | -3 dB | 0 dB | +3 dB | +6 dB |
+
+Pan and sends use `(8 - row) / 8` (0..1).
 
 | Action | Effect |
 |---|---|
-| Grid pad in column `c`, row `r` | Sets global track `c`'s value to `(8 - r) / 8` |
-| Double-tap the bottom pad | Sets the true minimum (0.0) |
-| Up (CC 80) | Nudges the last touched track's value by +1/8, clamped to 0..1 |
-| Down (CC 70) | Nudges the last touched track's value by -1/8, clamped to 0..1 |
+| Grid pad in column `c`, row `r` | Sets global track `c`'s value (volume: the dB step for `r`) |
+| Double-tap the bottom pad | Sets the true minimum (0.0) for pan/sends |
+| Up (CC 80) | Nudges the last touched track's value one step up |
+| Down (CC 70) | Nudges the last touched track's value one step down |
 | Tap sends (CC 6) while the sends menu is open | Cycles send 1-4 |
 
-Volume and pan write `mpc.tracks.normalTracks[i].Volume.value` / `.Pan.value` (0..1,
-pan 0.5 = centre). Sends write `.Send1`..`.Send4.value` (0..1). The faders are cyan
-(volume), magenta (pan) and yellow (sends); the active function button is white.
+Volume writes `mpc.tracks.normalTracks[i].VolumeDB.value` (dB) and falls back to
+`.Volume.value` if `VolumeDB` is read-only. Pan writes `.Pan.value` (0..1, 0.5 = centre).
+Sends write `.Send1`..`.Send4.value` (0..1). The faders are cyan (volume), magenta (pan)
+and one colour per send (yellow/green/blue/orange); the active function button is white.
 
 ## Right column (CC 19-89 + 99)
 

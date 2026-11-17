@@ -117,6 +117,13 @@ local C = {
 	yellow = { 127, 127, 0 },
 }
 
+-- Volume fader steps, bottom (row 7) to top (row 0), in dB.
+-- -inf is sent as a very low dB so the MPC shows -inf.
+local VOLUME_DB = { [7] = -100, [6] = -30, [5] = -20, [4] = -9, [3] = -3, [2] = 0, [1] = 3, [0] = 6 }
+
+-- One colour per send so Send 1-4 are distinguishable.
+local SEND_COLOURS = { C.yellow, C.green, C.blue, C.orange }
+
 -- State
 local aperture, clipProps
 local shift = false
@@ -190,6 +197,27 @@ local function clamp01(v)
 		return 1
 	end
 	return v
+end
+
+-- Nearest volume-fader row (0 = top, 7 = bottom) for a dB value.
+local function dbToRow(db)
+	db = tonumber(db)
+	if db == nil or db <= -60 then
+		return 7
+	elseif db <= -25 then
+		return 6
+	elseif db <= -14.5 then
+		return 5
+	elseif db <= -6 then
+		return 4
+	elseif db <= -1.5 then
+		return 3
+	elseif db <= 1.5 then
+		return 2
+	elseif db <= 4.5 then
+		return 1
+	end
+	return 0
 end
 
 local function trackAt(idx)
@@ -359,18 +387,26 @@ local function paintAdjustGrid()
 	if adjustMode == "pan" then
 		colour = C.magenta
 	elseif adjustMode == "sends" then
-		colour = C.yellow
+		colour = SEND_COLOURS[adjustSend] or C.yellow
 	end
 	local name = adjustPropName()
 	for col = 0, GRID_COLS - 1 do
 		local gc = globalPos(col, 0)
 		local t = trackAt(gc)
 		if t then
-			local value = propValue(t, name) or 0
-			if type(value) ~= "number" then
-				value = 0
+			local litCount
+			if adjustMode == "volume" then
+				-- dB fader: -inf = no pads, +6 dB = all 8 pads
+				local db = propValue(t, "VolumeDB")
+				local row = dbToRow(db)
+				litCount = (db ~= nil and db <= -60) and 0 or (GRID_ROWS - row)
+			else
+				local value = propValue(t, name) or 0
+				if type(value) ~= "number" then
+					value = 0
+				end
+				litCount = math.floor(value * GRID_ROWS + 0.5)
 			end
-			local litCount = math.floor(value * GRID_ROWS + 0.5)
 			for row = 0, GRID_ROWS - 1 do
 				local idx = 10 * (8 - row) + col + 1
 				local fromBottom = 7 - row
@@ -763,6 +799,29 @@ local function setTrackValue(idx, name, v)
 	log(string.format("%s track %d = %.3f", name, idx, value))
 end
 
+-- Write a track's VolumeDB directly (dB), falling back to the linear Volume
+-- property if VolumeDB is read-only on this firmware.
+local function setTrackVolumeDB(idx, db)
+	local t = trackAt(idx)
+	if not t then
+		logOnce("track", "no track " .. tostring(idx))
+		return
+	end
+	local p = t.VolumeDB
+	if p ~= nil then
+		local ok = pcall(function()
+			p.value = db
+		end)
+		if ok then
+			log(string.format("VolumeDB track %d = %s", idx, tostring(db)))
+			return
+		end
+	end
+	-- fallback: approximate linear value from dB (0 dB ~= 0.75 on the MPC curve)
+	local linear = db <= -60 and 0 or clamp01((db + 60) / 66)
+	setTrackValue(idx, "Volume", linear)
+end
+
 local function nudgeAdjust(delta)
 	if not adjustMode then
 		return
@@ -770,6 +829,18 @@ local function nudgeAdjust(delta)
 	local gc = globalPos(adjustCol, 0)
 	local name = adjustPropName()
 	if not name then
+		return
+	end
+	if adjustMode == "volume" then
+		local db = propValue(trackAt(gc), "VolumeDB")
+		local row = dbToRow(db)
+		if delta > 0 then
+			row = math.max(0, row - 1)
+		else
+			row = math.min(GRID_ROWS - 1, row + 1)
+		end
+		setTrackVolumeDB(gc, VOLUME_DB[row])
+		paintAll()
 		return
 	end
 	local cur = propValue(trackAt(gc), name)
@@ -804,6 +875,14 @@ local function handleAdjustPad(col, row)
 	if not adjustMode then
 		return
 	end
+	local gc = globalPos(col, 0)
+	if adjustMode == "volume" then
+		setTrackVolumeDB(gc, VOLUME_DB[row])
+		lastPadCol, lastPadRow, lastPadTick = col, row, ticks
+		adjustCol = col
+		paintAll()
+		return
+	end
 	local value = (GRID_ROWS - row) / GRID_ROWS
 	-- double-tapping the bottom pad reaches the true minimum (0.0)
 	if col == lastPadCol and row == lastPadRow and ticks - lastPadTick <= 2 then
@@ -813,7 +892,6 @@ local function handleAdjustPad(col, row)
 	end
 	lastPadCol, lastPadRow, lastPadTick = col, row, ticks
 	adjustCol = col
-	local gc = globalPos(col, 0)
 	local name = adjustPropName()
 	if name then
 		setTrackValue(gc, name, value)

@@ -24,14 +24,14 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | Limit | Status |
 |---|---|
 | **Q-links** | Not implemented (later phase). |
-| **Volume/pan/sends menus** | Grid pads set 8 discrete values (`(7 - row) / 7`); up/down nudge by 1/8. No finer control. |
+| **Volume/pan/sends menus** | Grid pads set 8 discrete values; volume uses clean dB steps (-inf, -30, -20, -9, -3, 0, +3, +6 dB), pan/sends use `(8 - row) / 8`; up/down nudge one step. No finer control. |
 | **Track device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
 | **Save/quantize** | Stubbed with `TODO` logs. |
 | **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |
 | **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
-| **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. |
+| **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. Volume writes `VolumeDB` (dB) with a `Volume` fallback; sends 1-4 use different colours. |
 | **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome; Shift + CC 6/7/8 = tap tempo/tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
