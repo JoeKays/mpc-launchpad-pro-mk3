@@ -24,11 +24,13 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | Limit | Status |
 |---|---|
 | **Q-links** | Not implemented (later phase). |
-| **Track volume/pan/sends/device** | Stubbed with `TODO` logs (later phase). |
+| **Track volume/pan/sends** | Implemented as a hold + track-button adjustment mode (grid rows / up-down nudges); no physical faders. |
+| **Track adjustment mode** | Grid pads set 8 discrete values (`row / 7`); up/down nudge by 1/8. No finer control. |
+| **Track device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
 | **Save/quantize/duplicate/clear** | Stubbed with `TODO` logs. |
-| **Swing/tap tempo/tempo** | Stubbed with `TODO` logs. |
+| **Swing/tempo** | Stubbed with `TODO` logs. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
 | **CC 30 (fixed length)** | Registered, but absent from the learn artifact; may not arrive. |
 | **LPP3 mode** | The script enters Programmer mode automatically (layout query + select 0x11) and restores the prior layout on unload. |

@@ -44,6 +44,12 @@ for i = 0, 7 do
     Solo = prop(false),
     Colour = prop(0x00FF00),
     Name = prop("Track " .. i),
+    Volume = prop(0.5),
+    Pan = prop(0.5),
+    Sends1 = prop(0),
+    Sends2 = prop(0),
+    Sends3 = prop(0),
+    Sends4 = prop(0),
   }
   t.SetRecArm = function(v) record("SetRecArm", i, v); t.RecArm:set(v) end
   t.SetMute = function(v) record("SetMute", i, v); t.Mute:set(v) end
@@ -102,6 +108,8 @@ local aperture = {
   MoveDown = function(n) record("MoveDown", n) end,
   ToGlobalColumn = function(c) return c + originCol end,
   ToGlobalRow = function(r) return r end,
+  ToLocalColumn = function(i) return i - originCol end,
+  ToLocalRow = function(i) return i end,
   clipProperties = clipProperties,
   sceneProperties = sceneProperties,
 }

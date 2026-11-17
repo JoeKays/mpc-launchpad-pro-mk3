@@ -66,6 +66,23 @@ journalctl -u acvs -o cat --no-pager | grep LaunchpadProMK3
 8. Scroll right (92), then hold CC 2 (mute) + press CC 101. Expect `SetMute(...) track 1`
    (the track now in the first grid column), not track 0.
 
+## 5b. Track volume / pan / sends
+
+1. Hold CC 4 (volume), press CC 101 (track 0). Expect `SelectTrack(0)` and
+   `adjust volume track 0`. Release CC 4.
+2. Press the bottom-left pad (note 11). Expect `Volume track 0 = 1.000`.
+3. Press the top-left pad (note 81). Expect `Volume track 0 = 0.000`.
+4. Press CC 80 (up). Expect `Volume track 0 = 0.125`; CC 70 (down) returns to 0.
+5. Hold CC 5 (pan), press CC 102 (track 1). Press the pad in column 1, row 4
+   (note 42). Expect `Pan track 1 = 0.571`.
+6. Hold CC 6 (sends), press CC 103 (track 2). Press the pad in column 0, row 7
+   (note 11). Expect `send 1`, `Sends1 track 2 = 1.000`.
+7. Press the pad in column 1, row 3 (note 52). Expect `send 2`,
+   `Sends2 track 2 = 0.429`.
+8. Shift + CC 6. Expect `send 3`. Press the pad in column 2, row 7 (note 13).
+   Expect `Sends3 track 2 = 1.000`.
+9. Press CC 101 without a held function. Expect `adjust off` and `SelectTrack(0)`.
+
 ## 6. Transport
 
 1. Press 20. Expect `Play` and MPC plays; the play button lights green.
@@ -101,6 +118,8 @@ LaunchpadProMK3: SetSolo(true) track 2
 LaunchpadProMK3: hold stopClip
 LaunchpadProMK3: StopClipsOnTrack(3)
 LaunchpadProMK3: SelectTrack(0)
+LaunchpadProMK3: adjust volume track 0
+LaunchpadProMK3: Volume track 0 = 1.000
 LaunchpadProMK3: Play
 LaunchpadProMK3: Stop
 LaunchpadProMK3: Record
