@@ -37,6 +37,27 @@ the grid window: after scrolling right by one, CC 101 controls the track now in 
 grid column (global track 1), not global track 0. The track buttons show the held
 function's state (mute = orange, solo = yellow, rec arm = red) or the track colour.
 
+## Shift functions (Shift + CC 1-8)
+
+Shift is CC 90. While Shift is held, the function buttons (CC 1-8) run the shift
+function instead of holding a track function. Shift is checked before the held-function
+state, so a shift function works even while another function button is held; the held
+function is preserved (releasing the shift-function button does not clear it).
+
+| Shift + CC | Action | MPC call |
+|---|---|---|
+| 1 | undo | `commandManager.Undo()` |
+| 2 | redo | `commandManager.Redo()` |
+| 3 | click/metronome | `sequencer.SetMetronomeEnabled(not MetronomeEnabled)` |
+| 4 | — | — |
+| 5 | — | — |
+| 6 | tap tempo (stub) | logs `tap tempo: TODO` |
+| 7 | tempo (stub) | logs `tempo: TODO` |
+| 8 | swing (stub) | logs `swing: TODO` |
+
+Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
+leaves the surface working.
+
 ## Right column (CC 19-89 + 99)
 
 Primary = row trigger (scene launch); Shift = the label functions.
