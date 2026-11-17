@@ -489,21 +489,26 @@ local function paintTempoGrid()
 			ledOff(10 * (8 - row) + col + 1)
 		end
 	end
-	local text, digitW, gap
+	-- Left-aligned, no gaps. The hundreds digit is narrow (1 column for a
+	-- leading 1, 2 columns otherwise) so the tens and ones digits get the rest
+	-- of the width and show more detail.
+	local text
+	local widths = {}
 	if bpm >= 100 then
 		text = string.format("%3d", bpm)
-		digitW = 2
-		gap = 1
+		widths[1] = (text:sub(1, 1) == "1") and 1 or 2
+		local remaining = GRID_COLS - widths[1]
+		widths[2] = math.floor(remaining / 2)
+		widths[3] = remaining - widths[2]
 	else
 		text = string.format("%2d", bpm)
-		digitW = 4
-		gap = 0
+		widths[1] = 4
+		widths[2] = 4
 	end
-	local n = #text
-	local totalW = n * digitW + (n - 1) * gap
-	local x0 = math.floor((GRID_COLS - totalW) / 2)
-	for i = 1, n do
-		drawDigit(text:sub(i, i), x0 + (i - 1) * (digitW + gap), 0, digitW, GRID_ROWS)
+	local x0 = 0
+	for i = 1, #text do
+		drawDigit(text:sub(i, i), x0, 0, widths[i], GRID_ROWS)
+		x0 = x0 + widths[i]
 	end
 end
 

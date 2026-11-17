@@ -92,11 +92,10 @@ L.HandleMIDICC(0, 6, 0)
 -- Shift + CC 7 = tempo page: up/down change BPM, holding accelerates.
 L.HandleMIDICC(0, 7, 127) -- enter tempo page
 assert_eq(lastLog(), "LaunchpadProMK3: tempo page: 120 BPM", "tempo page on")
--- The grid draws the BPM: 120 = "1" (col 1), "2" (cols 3-4), "0" (cols 6-7).
-assert_eq(mock.leds[82][1], 127, "tempo digit 1 lit")
-assert_eq(mock.leds[84][1], 127, "tempo digit 2 lit")
-assert_eq(mock.leds[87][1], 127, "tempo digit 0 lit")
-assert_eq(mock.leds[83][1], 0, "tempo gap dark")
+-- The grid draws the BPM left-aligned: 120 = "1" (col 0), "2" (cols 1-3), "0" (cols 4-7).
+assert_eq(mock.leds[81][1], 127, "tempo digit 1 lit")
+assert_eq(mock.leds[82][1], 127, "tempo digit 2 lit")
+assert_eq(mock.leds[85][1], 127, "tempo digit 0 lit")
 L.HandleMIDICC(0, 7, 0)
 L.HandleMIDICC(0, 80, 127) -- up: +1 BPM
 assert_eq(mock.find("SetBPM")[3].args[1], 121, "tempo up")
