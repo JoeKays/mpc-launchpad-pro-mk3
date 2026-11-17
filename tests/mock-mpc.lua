@@ -130,33 +130,6 @@ local commandManager = {
 	end,
 }
 
--- Q-Links (mpc.controlSurface.qlinks, 0-based, 16 knobs)
-local qlinkPositions = {}
-local qlinks = {}
-for i = 0, 15 do
-	qlinks[i] = {
-		GetPosition = function()
-			return qlinkPositions[i] or 0
-		end,
-		SetPosition = function(pos)
-			qlinkPositions[i] = pos
-			record("SetPosition", i, pos)
-		end,
-		GetValue = function()
-			return (qlinkPositions[i] or 0) / 127
-		end,
-		GetValueString = function()
-			return tostring(qlinkPositions[i] or 0)
-		end,
-		GetTargetName = function()
-			return "target" .. i
-		end,
-	}
-end
-qlinks.GetNumQLinks = function()
-	return 16
-end
-
 -- virtual Force buttons (mpc.force.<name>.Press/Release)
 local force = {}
 for _, name in ipairs({ "copy", "delete" }) do
@@ -334,10 +307,7 @@ local mpc = {
 	sequencer = sequencer,
 	commandManager = commandManager,
 	force = force,
-	controlSurface = {
-		pads = { Tap = function() end, Press = function() end, Release = function() end },
-		qlinks = qlinks,
-	},
+	controlSurface = { pads = { Tap = function() end, Press = function() end, Release = function() end } },
 	ui = {
 		ShowTUIFeedback = function(s)
 			record("ShowTUIFeedback", s)

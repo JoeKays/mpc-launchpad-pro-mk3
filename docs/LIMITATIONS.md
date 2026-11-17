@@ -13,8 +13,8 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Cannot drive a non-current track**: `aperture.SelectTrack` moves MPC's current track; no separate controller track | FINDINGS 33 | Track functions act on the selected track. |
 | **Note editing only on the selected clip** | FINDINGS 33 | No per-clip event editing from the surface. |
 | **Scale/root of pad perform is invisible** | FINDINGS 29 | The script cannot show the MPC's scale/root. |
-| **`qlinks.GetPosition()` lags one change**; `Twist` wraps | FINDINGS 26 | The Q-Link page reads `GetPosition()` each repaint; a one-change lag is acceptable for a fader display. |
-| **Q-link bank changes update all 16 at once** | FINDINGS 26 | The Q-Link page shows 8 at a time (banks 0-7 / 8-15) and repaints every 2 s, so a bank change is picked up on the next repaint. |
+| **`qlinks.GetPosition()` lags one change**; `Twist` wraps | FINDINGS 26 | Q-links are not implemented in phase 1. |
+| **Q-link bank changes update all 16 at once** | FINDINGS 26 | Q-links are not implemented in phase 1. |
 | **No LED state for `mpc.force.*`** | FINDINGS 30 | The script derives lights from readable state. |
 | **No USB access** from Lua | FINDINGS 2 | No Push 2 display, no bulk USB. |
 | **Gen 2 (Live III) has no stock root** | FINDINGS 2, 7, 30 | Out of scope here. |
@@ -35,7 +35,6 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Stop clip** | Hold CC 8 + a track button (CC 101-108) or a clip pad stops that track's clips (`aperture.StopClipsOnTrack`); the clip pad does not launch while stop clip is held. |
 | **Empty tracks** | Fader menus only light tracks below `mpc.tracks.SizeNormalTracks`; empty tracks stay dark. |
 | **Swing/tap tempo/tempo** | Shift + CC 6 = tap tempo (uses `dev.timer.Now()` millisecond timestamps, averages the last 5 taps, sets integer `sequencer.SetBPM`); Shift + CC 7 = tempo page (grid draws the BPM left-aligned as scaled 7-segment digits, coloured by position: ones white, tens orange, hundreds blue — blue/orange/white differ in hue and luminance for colourblind accessibility; up/down change BPM, hold accelerates); Shift + CC 8 = swing stub with a `TODO` log. |
-| **Q-Link page** | CC 7 (device) opens the Q-Link page: the grid shows Q-Links 0-7 as cyan faders (bottom-up), press a pad to set that Q-Link's position (`SetPosition`, 0-127), up/down switch to Q-Links 8-15, Shift+up/down nudge the selected Q-Link by 1; press CC 7 again to exit. Uses `mpc.controlSurface.qlinks` (16 knobs, 0-based). |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome, Shift + CC 6 = tap tempo, Shift + CC 7 = tempo page; Shift + CC 8 = swing stub. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
 | **CC 30 (fixed length)** | Registered, but absent from the learn artifact; may not arrive. |

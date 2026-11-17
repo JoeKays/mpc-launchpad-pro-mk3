@@ -30,7 +30,7 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
 | `mpc.tracks.GetMute/SetMute/GetSolo/GetTrackRecordArmed` | PASS — not used | `applyFunction` uses `normalTracks[i]` |
 | `mpc.GetState` / `#GetState` | PASS — not used | no reference |
 | `pads.Tap` for velocity hits | PASS — not used | no pad mapping in phase 1 |
-| `qlinks.GetPosition` | PASS | Q-Link page reads it each repaint (`paintQlinkGrid`) |
+| `qlinks.GetPosition` | PASS — not used | Q-links stubbed |
 
 ## 3. Clip mode
 
@@ -105,7 +105,6 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
 | Clip clear/duplicate | PASS (guarded) | `pressForce`, `doEdit`; `tests/test-clip-ops.lua`; `mpc.force.*` may be a no-op on non-Force hardware |
 | Undo/redo shift functions | PASS | `doShiftFunction` guards; held-function release fix; `tests/test-undo-redo.lua` |
 | Track volume/pan/sends | PASS | `enterAdjust`/`handleAdjustPad`/`nudgeAdjust`; `tests/test-track-controls.lua` |
-| Q-Link page | PASS | `enterQlink`/`paintQlinkGrid`/`handleQlinkPad`/`nudgeQlink`; `mpc.controlSurface.qlinks`; `tests/test-qlink.lua` |
 
 ## 10. Prioritized fix list
 
@@ -113,6 +112,6 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
    track row CC 101-108, CC 30, top row 8 vs 9, Shift = CC 90.
 2. **Device-test clip clear/duplicate** (CC 50/60): `mpc.clipMatrix.CopyClip`/`DeleteClip`
    are present in the 3.10.1 binary; confirm they work on the Live III.
-3. **Track device** (CC 7) opens the Q-Link page; Shift + CC 7 is the tempo page.
+3. **Track device** (CC 7) remains a stub; Q-links are a later phase.
 4. **Clip edits**: quantize (CC 40), note editing on the selected clip.
 5. **Stop all clips**: a dedicated button (`clipMatrix.StopAllClips`).

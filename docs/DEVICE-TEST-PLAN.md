@@ -125,10 +125,5 @@ LaunchpadProMK3: Stop
 LaunchpadProMK3: Record
 LaunchpadProMK3: Undo
 LaunchpadProMK3: Redo
-LaunchpadProMK3: qlink page
-LaunchpadProMK3: qlink 0 = 127 (0.0 dB)
-LaunchpadProMK3: qlink bank 2
-LaunchpadProMK3: qlink 8 = 127 (0.0 dB)
-LaunchpadProMK3: qlink page off
 LaunchpadProMK3: unloaded
 ```

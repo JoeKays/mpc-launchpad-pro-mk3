@@ -31,7 +31,7 @@ and press it again to exit.
 | 4 | volume menu | — |
 | 5 | pan menu | — |
 | 6 | sends menu | tap again to cycle send 1-4 |
-| 7 | Q-Link page | tempo page: up/down change BPM, hold to accelerate |
+| 7 | tempo page (Shift) | tempo page: up/down change BPM, hold to accelerate |
 | 8 | stop clip | swing (stub) |
 
 Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or hold CC 8
@@ -58,7 +58,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 4 | — | — |
 | 5 | — | — |
 | 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
-| 7 | Q-Link page | press to open the Q-Link page: the grid shows Q-Links 0-7 as cyan faders (bottom-up), press a pad to set that Q-Link's position, up/down switch to Q-Links 8-15, Shift+up/down nudge the selected Q-Link by 1; press again to exit. Shift+7 is the tempo page |
+| 7 | tempo page (Shift) | toggles the tempo page; the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones white, tens orange, hundreds blue; blue/orange/white differ in hue and luminance for colourblind accessibility); up/down change BPM (hold accelerates) |
 | 8 | swing (stub) | logs `swing: TODO` |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and

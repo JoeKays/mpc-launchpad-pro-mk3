@@ -10,8 +10,8 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends + tap tempo + tempo page + Q-Link page are implemented and
-host-tested. Track device (CC 7) opens the Q-Link page; Shift + CC 7 is the tempo page.
+track volume/pan/sends are implemented and host-tested. Track device and Q-links are
+stubbed for later phases.
 
 ## What it does
 
@@ -33,10 +33,6 @@ host-tested. Track device (CC 7) opens the Q-Link page; Shift + CC 7 is the temp
 - **Track controls**: press volume/pan/sends (CC 4/5/6) to open a fader menu aligned with
   the clip view; press a grid pad to set a track's value, up/down (CC 80/70, ±1/8) to
   nudge, and press the function button again to exit; tapping CC 6 cycles sends. Volume/pan/sends write `normalTracks[i].Volume/Pan/Send1-4.value`.
-- **Q-Link page**: press CC 7 (device) to open the Q-Link page; the grid shows Q-Links 0-7
-  as cyan faders (bottom-up), press a pad to set that Q-Link's position, up/down switch to
-  Q-Links 8-15, Shift+up/down nudge the selected Q-Link by 1; press CC 7 again to exit.
-  Uses `mpc.controlSurface.qlinks` (16 knobs, 0-based). Shift + CC 7 is the tempo page.
 - **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
   clip/step/track modes.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
