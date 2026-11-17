@@ -71,7 +71,10 @@ MPC action mapping (phase 1 clip mode first):
 - Grid: `TriggerClip(col, 7-padRow)`; Shift+pad = `SelectClip(col, 7-padRow)`. The bottom-left pad (note 11) maps to MPC row 7 (bottom); the top-left (note 81) to MPC row 0 (top).
 - 91/92: window left/right (`MoveLeft/Right`); Shift = page by 8.
 - 80/70: window up/down (`MoveUp/Down`); Shift = page by 8.
-- 93 session: clip mode; 97 sequencer: step mode (stub); 98 projects/save: save (stub).
+- 93 session: clip mode (exits any pad mode); 94 note: MPC pads mode (bottom-left 4x4
+  quadrant mirrors + plays the MPC pads via `mappings.pads`); 96 custom: track mute mode
+  (bottom two grid rows mute tracks 0-15 via `mappings.tracks.mutes`); 97 sequencer: step
+  mode (stub); 98 projects/save: save (stub).
 - 20 play: `IsPlaying` ? `Stop` : `Play`; 10 record: `Record`; 40 quantize / 50 duplicate / 60 clear: stubs.
 - Track row CC 101-108: `SelectTrack(globalPos(col,0))`; hold a function button (CC 1-8) then press a track button to apply it to that track.
 - Function buttons CC 1-8: record arm/mute/solo/volume/pan/sends/device/stop clip; Shift variants undo/redo/click/tap tempo/tempo/swing.
