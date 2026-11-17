@@ -72,9 +72,15 @@ assert_eq(mock.count("SetMetronomeEnabled"), 2, "metronome off")
 assert_eq(mock.find("SetMetronomeEnabled")[2].args[1], false, "metronome disabled")
 L.HandleMIDICC(0, 3, 0)
 
--- Shift + CC 6/7/8 = tap tempo / tempo / swing stubs: they log and do not crash
+-- Shift + CC 6 = tap tempo: two taps 500 ms apart set 120 BPM.
 L.HandleMIDICC(0, 6, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: TODO", "tap tempo stub")
+assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: first tap", "tap tempo first tap")
+L.HandleMIDICC(0, 6, 0)
+L.HandleTimer()
+L.HandleTimer() -- 2 ticks = 500 ms
+L.HandleMIDICC(0, 6, 127)
+assert_eq(mock.count("SetBPM"), 1, "tap tempo SetBPM")
+assert_eq(mock.find("SetBPM")[1].args[1], 120, "tap tempo 120 BPM")
 L.HandleMIDICC(0, 6, 0)
 L.HandleMIDICC(0, 7, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: tempo: TODO", "tempo stub")

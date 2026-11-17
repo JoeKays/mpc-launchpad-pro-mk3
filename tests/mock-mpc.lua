@@ -110,6 +110,12 @@ local sequencer = {
 		record("SetMetronomeEnabled", v)
 	end,
 	MetronomeEnabled = prop(false),
+	SetBPM = function(bpm)
+		record("SetBPM", bpm)
+	end,
+	GetBPM = function()
+		return 120
+	end,
 }
 
 -- command manager

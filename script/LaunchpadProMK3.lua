@@ -142,6 +142,7 @@ local adjustCol = 0 -- last grid column touched in the menu (for up/down nudges)
 local lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 local clipOp = nil -- nil / "duplicate" / "clear"
 local clipOrigin = nil -- {col, row} for duplicate
+local tapTicks = {} -- recent tap-tempo tick timestamps (250 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
 local layoutQuerySent = false
@@ -956,6 +957,37 @@ end
 -- Shift + a function button: the shift function (undo/redo/click/tap/tempo/swing).
 -- Shift is checked before the held-function state, so these run even while another
 -- function button is held; the held function is left untouched.
+-- Tap tempo: average the last few tap intervals (timer runs at 250 ms).
+local function doTapTempo()
+	local now = ticks
+	-- a gap longer than 2 s starts a new tap sequence
+	if #tapTicks > 0 and now - tapTicks[#tapTicks] > 8 then
+		tapTicks = {}
+	end
+	tapTicks[#tapTicks + 1] = now
+	if #tapTicks > 5 then
+		table.remove(tapTicks, 1)
+	end
+	if #tapTicks < 2 then
+		log("tap tempo: first tap")
+		return
+	end
+	local total = 0
+	for i = 2, #tapTicks do
+		total = total + (tapTicks[i] - tapTicks[i - 1])
+	end
+	local avgTicks = total / (#tapTicks - 1)
+	local bpm = math.floor(240 / avgTicks + 0.5)
+	bpm = math.max(20, math.min(300, bpm))
+	local sq = mpc.sequencer
+	if sq and type(sq.SetBPM) == "function" then
+		call(sq.SetBPM, bpm)
+		log("tap tempo: " .. bpm .. " BPM")
+	else
+		logOnce("tapbpm", "tap tempo unavailable: sequencer.SetBPM missing")
+	end
+end
+
 local function doShiftFunction(fn)
 	if fn == "recArm" then
 		local cm = mpc.commandManager
@@ -983,7 +1015,7 @@ local function doShiftFunction(fn)
 			logOnce("metronome", "metronome unavailable: sequencer.SetMetronomeEnabled missing")
 		end
 	elseif fn == "sends" then
-		log("tap tempo: TODO")
+		doTapTempo()
 	elseif fn == "device" then
 		log("tempo: TODO")
 	elseif fn == "stopClip" then
