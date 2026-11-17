@@ -11,6 +11,9 @@ The LPP3's bottom-left pad (note 11) maps to MPC clip row 7 (bottom); the top-le
 (note 81) maps to MPC clip row 0 (top). The script inverts the row so the grid is not
 upside down.
 
+While a pad mode is open (CC 94 MPC pads or CC 96 track mute) the grid belongs to that
+mode and clip launch is suspended (see Pad modes below).
+
 | Action | MPC call |
 |---|---|
 | Pad press | `aperture.SelectClip(col, 7-padRow)` then `aperture.TriggerClip(col, 7-padRow)` |
@@ -105,6 +108,36 @@ then 50 ms). The pads are inert on this page. The swing value is read/written th
 `mpc.sequencer.quantiser.GetSwing()` / `SetSwing(50-75)`; the stop-clip button (CC 8) is
 white while the page is open and the up/down arrows take the swing page colour (yellow).
 
+### Pad modes (CC 94 MPC pads, CC 96 track mute)
+
+CC 94 (note) and CC 96 (custom) are pad modes: they hand a block of grid pads to the MPC
+so the pads are hardware-routed (the notes no longer reach the script) and mirror MPC
+state on their LEDs. Entering one closes the other, the volume/pan/sends menus, the
+tempo/swing pages and armed clip ops (they all need the grid); the scene column and the
+track row (CC 101-108) keep working, the rest of the grid is dark and inert. Press the
+mode button again, press CC 93 (session), enter another mode or page, or unload to exit:
+the 16 notes return to the script and the normal clip grid is repainted.
+
+**MPC pads mode (CC 94)**: pad 0-15 maps to the bottom-left 4x4 quadrant
+(`col = pad % 4`, `padRow = pad // 4`, `note = 10*(padRow+1)+col+1`, so pad 0 = note 11).
+Each note is unbound from the script and bound with `mappings.pads.AddNoteToMpcPad`, so
+the pads play the MPC's own pad bank. The quadrant LEDs mirror
+`mpc.controlSurface.pads[i].Colour` (ARGB int, alpha ignored, scaled to 0-127), polled
+from the script timer every 100 ms; only changed colours are sent. The note button is
+white while the mode is open, lighter grey when `controlSurface.pads` and `mappings.pads`
+exist, off otherwise.
+
+**Track mute mode (CC 96)**: track 0-15 maps to the bottom two grid rows
+(`col = track % 8`, `padRow = track // 8`, so track 0 = note 11, track 8 = note 21). Each
+note is bound with `mappings.tracks.mutes.AddNoteToTrackMute`, so a pad toggles that
+track's mute directly (always tracks 0-15, independent of the grid window). Unmuted pads
+show the track colour, muted pads dim grey (15,15,15); tracks beyond `SizeNormalTracks`
+stay dark. The custom button is white while the mode is open, lighter grey when
+`mappings.tracks.mutes` exists, off otherwise.
+
+If the mappings are missing the mode button stays off and pressing it changes nothing
+(the surface keeps today's behaviour).
+
 ### Quantize (CC 40)
 
 CC 40 applies quantize to the selected clip/notes by pressing the MPC's own quantize
@@ -137,9 +170,9 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 91 | < | window left (`MoveLeft`); Shift = 8 |
 | 92 | > | window right (`MoveRight`); Shift = 8 |
 | 93 | session | clip mode |
-| 94 | note | note mode (stub) |
+| 94 | note | MPC pads mode: the bottom-left 4x4 quadrant mirrors the MPC pad colours and plays the MPC pads; press again to exit |
 | 95 | chord | chord mode (stub) |
-| 96 | custom | custom mode (stub) |
+| 96 | custom | track mute mode: the bottom two grid rows toggle the mutes of tracks 0-15; press again to exit |
 | 97 | sequencer | step mode (stub) |
 | 98 | projects/save | save (stub) |
 
@@ -173,9 +206,10 @@ working.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
 - Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected.
-- Top row: current mode white, others dim; Shift white while held.
+- Top row: current mode white, others dim; Shift white while held; note (CC 94) and custom (CC 96) show pad-mode availability (lighter grey, off without the mappings) and turn white while their pad mode is open.
 - Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page or swing page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing). Fixed length is a stub and stays off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
+- Pad modes: MPC pads mode mirrors the MPC pad colours on the bottom-left 4x4 quadrant (diff-only, polled every 100 ms); track mute mode shows the track colour per unmuted pad and dim grey per muted pad on the bottom two rows; the active mode button is white.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),
 cached per index, one message per paint cycle.

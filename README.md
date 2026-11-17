@@ -10,8 +10,8 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize are implemented
-and host-tested.
+track volume/pan/sends + tap tempo + tempo page + swing page + quantize + MPC pads mode +
+track mute mode are implemented and host-tested.
 Track device and Q-links are stubbed for later phases.
 
 ## What it does
@@ -39,8 +39,15 @@ Track device and Q-links are stubbed for later phases.
   grid, up/down + hold to accelerate); Shift + CC 8 = swing page (swing % on the grid,
   50-75 where 50% is straight timing, up/down + hold to accelerate; reads/writes
   `sequencer.quantiser.GetSwing`/`SetSwing`).
-- **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
-  clip/step/track modes.
+- **MPC pads mode**: CC 94 hands the bottom-left 4x4 grid quadrant to the MPC pads
+  (hardware-routed via `mappings.pads`) and mirrors the MPC pad colours on their LEDs;
+  press again (or CC 93) to return to the clip grid.
+- **Track mute mode**: CC 96 turns the bottom two grid rows into mute toggles for tracks
+  0-15 via `mappings.tracks.mutes` (unmuted = track colour, muted = dim grey); press
+  again (or CC 93) to exit.
+- **Modes**: 93 session = clip, 94 note = MPC pads mode, 96 custom = track mute mode,
+  97 sequencer = step (stub); Shift + right-column 89/79/69 = clip/step/track modes.
+  Pad modes, fader menus and tempo/swing pages are mutually exclusive.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
   pressed control white — use it to verify the physical mapping on your unit.
 

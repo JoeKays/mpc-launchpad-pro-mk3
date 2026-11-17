@@ -22,8 +22,8 @@
 --                        99 novation logo (status/home; Shift = probe mode)
 --                        89 patterns, 79 steps, 69 pattern settings,
 --                        59 velocity, 49 probability, 39 mutation, 29 micro step, 19 print to clip
---   top row CC 90-98     90 shift, 91 <, 92 >, 93 session, 94 note, 95 chord,
---                        96 custom, 97 sequencer, 98 projects/save
+--   top row CC 90-98     90 shift, 91 <, 92 >, 93 session (clip grid), 94 MPC pads mode,
+--                        95 chord (stub), 96 track mute mode, 97 sequencer, 98 projects/save
 --   left column CC 10-80 10 record/capture midi, 20 play, 30 fixed length,
 --                        40 quantize/record quantize, 50 duplicate/double, 60 clear,
 --                        70 down, 80 up
@@ -148,6 +148,9 @@ local tempoHoldTicks = 0 -- ticks since the tempo button was pressed
 local swingMode = false -- Shift+CC8 swing page: up/down change swing
 local swingHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
 local swingHoldTicks = 0 -- ticks since the swing button was pressed
+local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
+local muteMode = false -- CC96 track mute mode: grid rows mute tracks 0-15
+local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
@@ -269,6 +272,22 @@ local function adjustColour()
 		return SEND_COLOURS[adjustSend] or C.yellow
 	end
 	return C.cyan
+end
+
+-- Pad mode availability: the mode button lights only when its mappings exist;
+-- otherwise it stays off and the surface keeps today's behaviour.
+local function padsModeAvailable()
+	local m = dev.mappings
+	return m ~= nil
+		and m.script ~= nil
+		and m.pads ~= nil
+		and mpc.controlSurface ~= nil
+		and mpc.controlSurface.pads ~= nil
+end
+
+local function muteModeAvailable()
+	local m = dev.mappings
+	return m ~= nil and m.script ~= nil and m.tracks ~= nil and m.tracks.mutes ~= nil
 end
 
 local function argb(c)
@@ -574,7 +593,87 @@ local function paintAdjustGrid()
 	end
 end
 
+-- Pads mode grid: the bottom-left 4x4 quadrant mirrors mpc.controlSurface.pads[i].Colour
+-- (ARGB int, alpha ignored); the rest of the grid is dark. poll=true re-reads the pad
+-- colours; padsColourCache keeps the last ARGB per pad so only diffs are sent.
+local function paintPadsGrid(poll)
+	local quadrant = {}
+	for i = 0, 15 do
+		quadrant[10 * (math.floor(i / 4) + 1) + (i % 4) + 1] = true
+	end
+	-- the rest of the grid stays dark; the quadrant pads are painted below
+	for row = 0, GRID_ROWS - 1 do
+		for col = 0, GRID_COLS - 1 do
+			local idx = 10 * (8 - row) + col + 1
+			if not quadrant[idx] then
+				ledOff(idx)
+			end
+		end
+	end
+	local pads = mpc.controlSurface and mpc.controlSurface.pads
+	for i = 0, 15 do
+		local idx = 10 * (math.floor(i / 4) + 1) + (i % 4) + 1
+		if poll then
+			local v = propValue(pads and pads[i], "Colour")
+			if v ~= padsColourCache[i] then
+				padsColourCache[i] = v
+				local r, g, b = argb(v)
+				ledRGB(idx, scale7(r), scale7(g), scale7(b))
+			end
+		elseif type(padsColourCache[i]) == "number" then
+			local r, g, b = argb(padsColourCache[i])
+			ledRGB(idx, scale7(r), scale7(g), scale7(b))
+		end
+	end
+end
+
+-- Mute mode grid: the bottom two rows show tracks 0-15 (track colour when unmuted, dim
+-- grey when muted); tracks beyond SizeNormalTracks stay dark.
+local function paintMuteGrid()
+	local trackCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
+	local bottom = {}
+	for i = 0, 15 do
+		bottom[10 * (math.floor(i / 8) + 1) + (i % 8) + 1] = true
+	end
+	-- the rows above the mute block stay dark; the mute pads are painted below
+	for row = 0, GRID_ROWS - 1 do
+		for col = 0, GRID_COLS - 1 do
+			local idx = 10 * (8 - row) + col + 1
+			if not bottom[idx] then
+				ledOff(idx)
+			end
+		end
+	end
+	for i = 0, 15 do
+		local idx = 10 * (math.floor(i / 8) + 1) + (i % 8) + 1
+		local t = trackAt(i)
+		if t and i < trackCount then
+			if propValue(t, "Mute") then
+				ledRGB(idx, 15, 15, 15) -- muted: dim grey
+			else
+				local c = propValue(t, "Colour")
+				local r, g, b = 0, 0, 0
+				if type(c) == "number" then
+					r, g, b = argb(c)
+				end
+				ledRGB(idx, scale7(r), scale7(g), scale7(b))
+			end
+		else
+			ledOff(idx) -- tracks beyond SizeNormalTracks stay dark
+		end
+	end
+end
+
 local function paintGrid()
+	if padsMode then
+		-- mirror refresh every 2 ticks (100 ms); between refreshes repaint from the cache
+		paintPadsGrid(ticks % 2 == 0)
+		return
+	end
+	if muteMode then
+		paintMuteGrid()
+		return
+	end
 	if tempoMode then
 		paintTempoGrid()
 		return
@@ -716,9 +815,9 @@ local function paintTop()
 	end
 	local session = modeColour("clip")
 	local sequencer = modeColour("step")
-	local note = modeColour("note")
+	local note = padsMode and C.white or (padsModeAvailable() and C.available or C.off)
 	local chord = modeColour("chord")
-	local custom = modeColour("custom")
+	local custom = muteMode and C.white or (muteModeAvailable() and C.available or C.off)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
 	ledRGB(TOP.note, note[1], note[2], note[3])
@@ -893,7 +992,132 @@ end
 -- Actions
 -----------------------------------------------------------------------------------------------
 
+-----------------------------------------------------------------------------------------------
+-- Pad modes (CC 94 MPC pads / CC 96 track mute)
+-----------------------------------------------------------------------------------------------
+
+-- The pad modes own the grid, so the grid-hungry states (fader menus, tempo/swing pages,
+-- armed clip ops) close when one opens.
+local function closeGridStates()
+	adjustMode = nil
+	tempoMode = false
+	swingMode = false
+	tempoHold = nil
+	swingHold = nil
+	clipOp = nil
+	clipOrigin = nil
+	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
+end
+
+-- Grid note of a pads-mode pad: padIndex 0-15 -> the bottom-left 4x4 quadrant.
+local function padsModeNote(i)
+	return 10 * (math.floor(i / 4) + 1) + (i % 4) + 1
+end
+
+-- Grid note of a mute-mode pad: trackIndex 0-15 -> the bottom two rows.
+local function muteModeNote(i)
+	return 10 * (math.floor(i / 8) + 1) + (i % 8) + 1
+end
+
+-- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
+local function exitPadsMode()
+	if not padsMode then
+		return
+	end
+	padsMode = false
+	local m = dev.mappings and dev.mappings.script
+	local pads = dev.mappings and dev.mappings.pads
+	for i = 0, 15 do
+		local note = padsModeNote(i)
+		call(pads and pads.RemoveNoteToMpcPad, 0, note, i)
+		call(m and m.AddNoteToScript, 0, note)
+	end
+	padsColourCache = {}
+	log("pads mode off")
+end
+
+-- Exit mute mode: hand the 16 notes back to the script (the caller repaints the clip grid).
+local function exitMuteMode()
+	if not muteMode then
+		return
+	end
+	muteMode = false
+	local m = dev.mappings and dev.mappings.script
+	local mutes = dev.mappings and dev.mappings.tracks and dev.mappings.tracks.mutes
+	for i = 0, 15 do
+		local note = muteModeNote(i)
+		call(mutes and mutes.RemoveNoteToTrackMute, 0, note, i)
+		call(m and m.AddNoteToScript, 0, note)
+	end
+	log("mute mode off")
+end
+
+local function exitPadModes()
+	exitPadsMode()
+	exitMuteMode()
+end
+
+-- Enter pads mode: route the 16 quadrant notes to the MPC pads (hardware-routed; they no
+-- longer reach HandleMIDINoteOn). Missing mappings degrade: the mode stays off.
+local function enterPadsMode()
+	local m = dev.mappings and dev.mappings.script
+	local pads = dev.mappings and dev.mappings.pads
+	if not (m and pads and m.RemoveNoteToScript and pads.AddNoteToMpcPad) then
+		logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
+		return
+	end
+	padsMode = true
+	padsColourCache = {}
+	for i = 0, 15 do
+		local note = padsModeNote(i)
+		call(m.RemoveNoteToScript, 0, note)
+		call(pads.AddNoteToMpcPad, 0, note, i)
+	end
+	log("pads mode on")
+end
+
+-- Enter mute mode: route the 16 bottom-row notes to the track mutes.
+local function enterMuteMode()
+	local m = dev.mappings and dev.mappings.script
+	local mutes = dev.mappings and dev.mappings.tracks and dev.mappings.tracks.mutes
+	if not (m and mutes and m.RemoveNoteToScript and mutes.AddNoteToTrackMute) then
+		logOnce("mutemode", "mute mode unavailable: mappings.tracks.mutes missing")
+		return
+	end
+	muteMode = true
+	for i = 0, 15 do
+		local note = muteModeNote(i)
+		call(m.RemoveNoteToScript, 0, note)
+		call(mutes.AddNoteToTrackMute, 0, note, i)
+	end
+	log("mute mode on")
+end
+
+local function togglePadsMode()
+	if padsMode then
+		exitPadsMode()
+		return
+	end
+	exitPadModes()
+	closeGridStates()
+	enterPadsMode()
+	if padsMode then
+		paintPadsGrid(true) -- immediate mirror, independent of the tick parity
+	end
+end
+
+local function toggleMuteMode()
+	if muteMode then
+		exitMuteMode()
+		return
+	end
+	exitPadModes()
+	closeGridStates()
+	enterMuteMode()
+end
+
 local function setMode(m)
+	exitPadModes() -- another mode (CC 93 session, CC 97, ...) always returns to the clip grid
 	mode = m
 	log("mode -> " .. m)
 	paintAll()
@@ -1079,6 +1303,7 @@ local function nudgeAdjust(delta)
 end
 
 local function enterAdjust(newMode)
+	exitPadModes() -- the fader menus need the whole grid
 	tempoMode = false
 	swingMode = false
 	adjustMode = newMode
@@ -1204,6 +1429,7 @@ local function doShiftFunction(fn)
 	elseif fn == "sends" then
 		doTapTempo()
 	elseif fn == "device" then
+		exitPadModes() -- the tempo page needs the whole grid
 		adjustMode = nil
 		swingMode = false
 		tempoMode = not tempoMode
@@ -1216,6 +1442,7 @@ local function doShiftFunction(fn)
 		paintAll()
 		flushLEDs()
 	elseif fn == "stopClip" then
+		exitPadModes() -- the swing page needs the whole grid
 		adjustMode = nil
 		tempoMode = false
 		tempoHold = nil
@@ -1304,6 +1531,9 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	end
 	local col, row = noteIndex(note)
 	if col then
+		if padsMode or muteMode then
+			return -- a pad mode owns the grid; the unbound pads stay inert
+		end
 		if velocity > 0 then
 			if heldFunction == "stopClip" then
 				local gc = globalPos(col, 0)
@@ -1400,6 +1630,16 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if cc == TOP.sequencer then
 		setMode("step")
+		return
+	end
+	if cc == TOP.note then
+		togglePadsMode()
+		paintAll()
+		return
+	end
+	if cc == TOP.custom then
+		toggleMuteMode()
+		paintAll()
 		return
 	end
 	for row = 0, 7 do
@@ -1587,6 +1827,9 @@ function LaunchpadProMK3.HandleTimer()
 	end
 	if ticks % 40 == 0 then
 		padCache = {}
+		if padsMode then
+			padsColourCache = {} -- force a full quadrant resend every 2 s
+		end
 	end -- resend everything every 2 s
 	paintAll()
 end
@@ -1600,6 +1843,9 @@ function LaunchpadProMK3.OnLoad()
 	adjustSend = 1
 	tempoMode = false
 	swingMode = false
+	padsMode = false
+	muteMode = false
+	padsColourCache = {}
 	clipOp = nil
 	clipOrigin = nil
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
@@ -1692,6 +1938,10 @@ end
 function LaunchpadProMK3.OnUnload()
 	call(dev.timer and dev.timer.Stop)
 	removeListeners()
+	exitPadModes() -- hand the pad-mode notes back to the script before unmapping
+	padsMode = false
+	muteMode = false
+	padsColourCache = {}
 	adjustMode = nil
 	adjustSend = 1
 	tempoMode = false

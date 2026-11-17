@@ -183,6 +183,16 @@ for _, name in ipairs({ "copy", "delete" }) do
 	}
 end
 
+-- virtual MPC pad bank (mpc.controlSurface.pads[i].Colour, ARGB int)
+local padsControl = {
+	Tap = function() end,
+	Press = function() end,
+	Release = function() end,
+}
+for i = 0, 15 do
+	padsControl[i] = { Colour = prop(0) }
+end
+
 -- aperture + clip properties
 local clipProperties = {}
 for c = 0, 7 do
@@ -284,6 +294,24 @@ local mappings = {
 			record("SetHandleSysex", b)
 		end,
 	},
+	pads = {
+		AddNoteToMpcPad = function(ch, note, pad)
+			record("AddNoteToMpcPad", ch, note, pad)
+		end,
+		RemoveNoteToMpcPad = function(ch, note, pad)
+			record("RemoveNoteToMpcPad", ch, note, pad)
+		end,
+	},
+	tracks = {
+		mutes = {
+			AddNoteToTrackMute = function(ch, note, track)
+				record("AddNoteToTrackMute", ch, note, track)
+			end,
+			RemoveNoteToTrackMute = function(ch, note, track)
+				record("RemoveNoteToTrackMute", ch, note, track)
+			end,
+		},
+	},
 }
 
 -- midi out
@@ -348,7 +376,7 @@ local mpc = {
 	commandManager = commandManager,
 	force = force,
 	controlSurface = {
-		pads = { Tap = function() end, Press = function() end, Release = function() end },
+		pads = padsControl,
 		quantizeApply = {
 			Press = function()
 				record("quantizeApply.Press")
