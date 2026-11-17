@@ -183,6 +183,12 @@ function M.setQlinkTarget(i, name)
 	qlinkTargets[i] = name
 end
 
+-- mark a qlink as a binary/flip parameter (Thru below 96, Kill above)
+local qlinkBinary = {}
+function M.setQlinkBinary(i)
+	qlinkBinary[i] = true
+end
+
 -- Q-Links (mpc.controlSurface.qlinks, 0-based, 16 knobs); SetPosition writes the position,
 -- Twist moves it by a delta (clamped 0-127), Touch records a touch.
 local qlinkPositions = {}
@@ -207,7 +213,11 @@ for i = 0, 15 do
 			return (qlinkPositions[i] or 0) / 127
 		end,
 		GetValueString = function()
-			return tostring(qlinkPositions[i] or 0)
+			local p = qlinkPositions[i] or 0
+			if qlinkBinary[i] then
+				return p >= 96 and "Kill" or "Thru"
+			end
+			return tostring(p)
 		end,
 		GetTargetName = function()
 			return qlinkTargets[i] or ("target" .. i)
@@ -522,6 +532,9 @@ function M.reset()
 	M.leds = {}
 	for k in pairs(qlinkTargets) do
 		qlinkTargets[k] = nil
+	end
+	for k in pairs(qlinkBinary) do
+		qlinkBinary[k] = nil
 	end
 end
 

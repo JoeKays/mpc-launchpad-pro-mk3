@@ -55,12 +55,13 @@ track navigation, plugin presets and the firmware probe are implemented and host
   grid, up/down + hold to accelerate); Shift + CC 8 = swing page (swing % on the grid,
   50-75 where 50% is straight timing, up/down + hold to accelerate; reads/writes
   `sequencer.quantiser.GetSwing`/`SetSwing`).
-- **Q-Link page**: CC 7 (device) toggles the Q-Link page; the grid shows Q-Links 0-7 as
-  cyan faders (up/down switches to Q-Links 8-15), press a pad to set that Q-Link,
-  Shift+up/down nudges the last touched column by 1; press CC 7 again to exit. Changes go
-  through `controlSurface.qlinks[i]` `Touch()` + `Twist(delta)` — `SetPosition` updates the
-  ValueString but not the edit-mode value, so it is only the missing-`Twist` fallback.
-  Shift + CC 7 remains the tempo page.
+- **Q-Link page**: CC 7 (device) opens the Q-Link page; tapping Device cycles page 1
+  (Q-Links 0-7) -> page 2 (Q-Links 8-15) -> exit. The four MPC Q-Link banks each get
+  their own fader colour (cyan/magenta/yellow/blue). Press a pad to set that Q-Link
+  (Touch + Twist), Shift+up/down nudges the last touched column by 1. Flip/binary
+  parameters are learned while you play: presses round to the extremes and the column
+  shows a single lit extreme pad. Unassigned Q-Links stay dark. Shift + CC 7 remains
+  the tempo page.
 - **MPC pads mode**: CC 94 hands the bottom-left 4x4 grid quadrant to the MPC pads
   (hardware-routed via `mappings.pads`) and mirrors the MPC pad colours on their LEDs;
   press again (or CC 93) to return to the clip grid.

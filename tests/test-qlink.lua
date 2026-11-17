@@ -18,6 +18,15 @@ local function lastCall(name)
 	return calls[#calls]
 end
 
+local logs = {}
+local realPrint = print
+_G.print = function(...)
+	logs[#logs + 1] = table.concat({ ... }, " ")
+end
+local function lastLog()
+	return logs[#logs] or ""
+end
+
 local function touchesOf(i)
 	local n = 0
 	for _, t in ipairs(mock.find("Touch")) do
@@ -103,7 +112,8 @@ assert_eq(c.args[1], 0, "qlink 0 after re-enter")
 assert_eq(c.args[2], -95, "qlink 0 delta to 32")
 assert_eq(mock.qlinks[0]:GetPosition(), 32, "qlink 0 = 32")
 
--- Press CC 7 again to exit; a pad now launches a clip and the button shows available.
+-- Press CC 7 twice to exit (page 2 first); a pad now launches a clip, button available.
+L.HandleMIDICC(0, 7, 127)
 L.HandleMIDICC(0, 7, 127)
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), clipCount + 1, "clip launch after exit")
@@ -125,4 +135,52 @@ mock.reset()
 mock.setQlinkTarget(0, "Kill EQ Low")
 mock.setQlinkTarget(1, "")
 
+-- Device tap cycles pages: page 1 -> page 2 -> exit.
+L.HandleMIDICC(0, 7, 127) -- guarantee closed first (may already be page 2)
+L.HandleMIDICC(0, 7, 127)
+L.HandleMIDICC(0, 7, 127) -- enter: page 1
+L.HandleMIDICC(0, 7, 127) -- tap again: page 2
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page 2", "device tap switches to page 2")
+assert_eq(mock.leds[7][1], 127, "device button still white on page 2")
+L.HandleMIDICC(0, 7, 127) -- tap again: exit
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "third tap exits")
+
+-- Re-enter page 1 for colour + flip tests.
+L.HandleMIDICC(0, 7, 127)
+mock.reset()
+-- bank colours on page 1: Q-Link 0 (bank 1) cyan, Q-Link 4 (bank 2) magenta
+local pos0 = mock.qlinks[0]:GetPosition()
+mock.qlinks[0].SetPosition(127)
+assert_eq(mock.qlinks[4]:GetPosition(), 0, "sanity")
+mock.qlinks[4].SetPosition(127)
+L.HandleTimer() -- odd tick: no repaint; force with a mode repaint
+L.HandleMIDICC(0, 7, 127) -- -> page 2
+L.HandleMIDICC(0, 7, 127) -- -> exit
+L.HandleMIDICC(0, 7, 127) -- -> page 1 again (fresh paint)
+assert_eq(mock.leds[81][2], 127, "qlink 0 top pad cyan g")
+assert_eq(mock.leds[81][1], 0, "qlink 0 top pad cyan r")
+mock.qlinks[0].SetPosition(pos0 or 0)
+
+-- Flip parameters: two value strings across a wide span -> presses round to extremes,
+-- and the column shows a single lit extreme pad.
+mock.setQlinkBinary(2)
+L.HandleMIDINoteOn(0, 83, 100) -- qlink 2 top pad -> 127 ("Kill")
+L.HandleMIDINoteOn(0, 13, 100) -- qlink 2 bottom pad -> 0 ("Thru")
+local flipLogged = false
+for _, l in ipairs(logs) do
+	if l == "LaunchpadProMK3: qlink 2 flip parameter" then
+		flipLogged = true
+	end
+end
+assert_eq(flipLogged and true or false, true, "flip parameter learned")
+L.HandleMIDINoteOn(0, 43, 100) -- middle pad, bottom half -> rounds to 0
+assert_eq(mock.qlinks[2]:GetPosition(), 0, "flip press rounds to the min extreme")
+L.HandleMIDINoteOn(0, 53, 100) -- middle pad, top half -> rounds to 127
+assert_eq(mock.qlinks[2]:GetPosition(), 127, "flip press rounds to the max extreme")
+-- display at the max extreme: only the top pad is lit (cyan = bank colour of qlink 2)
+assert_eq(mock.leds[83][1], 0, "flip max extreme pad lit (cyan r=0)")
+assert_eq(mock.leds[83][2], 127, "flip max extreme pad lit (cyan g)")
+assert_eq(mock.leds[13][1], 12, "flip: bottom pad dim when at max")
+
+_G.print = realPrint
 print("test-qlink: PASS")

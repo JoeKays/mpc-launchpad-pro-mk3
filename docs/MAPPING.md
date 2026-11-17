@@ -152,9 +152,9 @@ button press is logged and ignored.
 | Action | Effect |
 |---|---|
 | Grid pad in column `c`, row `r` | Sets Q-Link `qlinkPage * 8 + c` to `floor((8 - r) / 8 * 127 + 0.5)` |
-| Up (CC 80) / down (CC 70) | Switch to bank 2 / bank 1 (logs `qlink bank 2/1`) |
+| Device (CC 7) again | Cycle: page 1 -> page 2 -> exit |
+| Up (CC 80) / down (CC 70) | Switch to page 2 / page 1 (secondary) |
 | Shift + up / down | Nudge the last touched column's Q-Link by ±1 |
-| Device (CC 7) again | Exit |
 
 A pad set calls `Touch()` (if present; errors ignored), then drives `Twist(target -
 GetPosition())` with the delta clamped to ±127, repeated at most twice to absorb the
@@ -162,6 +162,16 @@ GetPosition())` with the delta clamped to ±127, repeated at most twice to absor
 string)`. If a qlink object has no `Twist`, the script falls back to `SetPosition(target)`
 and logs `qlink N = pos (setpos)` — `SetPosition` alone updates the Q-Link's ValueString
 but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMITATIONS).
+All 16 Q-Links are mapped: page 1 = Q-Links 0-7, page 2 = Q-Links 8-15 (tapping
+Device cycles page 1 -> page 2 -> exit). The 16 Q-Links are the MPC's four Q-Link
+banks of 4 knobs; each bank has its own fader colour — bank 1 (Q-Links 0-3) cyan,
+bank 2 (4-7) magenta, bank 3 (8-11) yellow, bank 4 (12-15) blue — on both pages.
+
+Flip/binary parameters (two value strings across a wide position span, e.g. Kill EQ
+Thru/Kill) are learned as you use them: once learned, presses round to the extremes
+(bottom half of the column = min, top half = max) and the column shows a single lit
+extreme pad instead of a fill, making the on/off state obvious.
+
 Q-Links with an empty target name (unassigned in the current Q-Link mode) stay fully
 dark and their pads are inert — the grid only shows faders that control something.
 The page is mutually exclusive with the fader menus, the tempo page and the swing page.

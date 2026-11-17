@@ -638,6 +638,15 @@ end
 -- Drive qlink i to pos: Twist(target - GetPosition()), clamped to +-127, repeated at most
 -- twice to absorb the GetPosition lag; falls back to SetPosition when Twist is missing.
 local qlinkTargetLogged = {} -- page-open diagnosis: one line per qlink
+-- The 16 Q-Links are the MPC's four Q-Link banks (4 knobs each); each bank gets its
+-- own fader colour so the groups are visually distinct on the grid.
+local QLINK_BANK_COLOURS = { C.cyan, C.magenta, C.yellow, C.blue }
+-- Flip/binary params (e.g. Kill EQ Thru/Kill) show the same value string for many
+-- positions and only two strings overall; once learned, presses round to 0/127 and
+-- the column shows a single lit extreme pad instead of a fill.
+local qlinkFlip = {}
+local qlinkSeenStrings = {} -- i -> set of distinct value strings observed
+local qlinkSeenPos = {} -- i -> { min = , max = }
 
 local function qlinkTargetName(i)
 	local q = qlinkAt(i)
@@ -690,7 +699,38 @@ local function setQlinkPosition(i, pos)
 		call(q.SetPosition, pos) -- keep the knob position in sync with the target
 	end
 	touchQlink(q)
-	log(string.format("qlink %d = %d (%s)", i, pos, tostring(call(q.GetValueString) or "")))
+	local str = tostring(call(q.GetValueString) or "")
+	log(string.format("qlink %d = %d (%s)", i, pos, str))
+	-- flip learning: remember distinct value strings and the position span; two distinct
+	-- strings across a wide span means the parameter is binary (round to extremes)
+	if str ~= "" then
+		local seen = qlinkSeenStrings[i]
+		if not seen then
+			seen = {}
+			qlinkSeenStrings[i] = seen
+		end
+		seen[str] = true
+		local span = qlinkSeenPos[i]
+		if not span then
+			span = { min = pos, max = pos }
+			qlinkSeenPos[i] = span
+		else
+			if pos < span.min then
+				span.min = pos
+			end
+			if pos > span.max then
+				span.max = pos
+			end
+		end
+		local n = 0
+		for _ in pairs(seen) do
+			n = n + 1
+		end
+		if n == 2 and span.max - span.min >= 48 and not qlinkFlip[i] then
+			qlinkFlip[i] = true
+			log(string.format("qlink %d flip parameter", i))
+		end
+	end
 end
 
 -- A qlink with an empty target name is unassigned in the current Q-Link mode: its
@@ -699,22 +739,34 @@ local function qlinkAssigned(i)
 	return qlinkTargetName(i) ~= ""
 end
 
+local function qlinkColour(i)
+	return QLINK_BANK_COLOURS[math.floor(i / 4) + 1] or C.cyan
+end
+
 local function paintQlinkGrid()
 	local count = qlinkCount()
 	for col = 0, GRID_COLS - 1 do
 		local i = qlinkPage * GRID_COLS + col
 		local assigned = i < count and qlinkAssigned(i)
 		local pos = assigned and qlinkPosition(i) or 0
+		local colour = qlinkColour(i)
 		local litCount = math.floor(pos / 127 * GRID_ROWS + 0.5)
 		for row = 0, GRID_ROWS - 1 do
 			local idx = 10 * (8 - row) + col + 1
 			local fromBottom = 7 - row
-			if assigned and fromBottom < litCount then
-				ledRGB(idx, C.cyan[1], C.cyan[2], C.cyan[3])
-			elseif assigned then
-				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
-			else
+			if not assigned then
 				ledOff(idx)
+			elseif qlinkFlip[i] then
+				-- binary parameter: only the matching extreme pad is lit (top = max)
+				if (pos >= 64 and row == 0) or (pos < 64 and row == GRID_ROWS - 1) then
+					ledRGB(idx, colour[1], colour[2], colour[3])
+				else
+					ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+				end
+			elseif fromBottom < litCount then
+				ledRGB(idx, colour[1], colour[2], colour[3])
+			else
+				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
 			end
 		end
 	end
@@ -725,7 +777,13 @@ local function handleQlinkPad(col, row)
 	if i >= qlinkCount() or not qlinkAssigned(i) then
 		return
 	end
-	local target = math.floor((GRID_ROWS - row) / GRID_ROWS * 127 + 0.5)
+	local target
+	if qlinkFlip[i] then
+		-- binary parameter: bottom half of the column = min extreme, top half = max
+		target = (row < GRID_ROWS / 2) and 127 or 0
+	else
+		target = math.floor((GRID_ROWS - row) / GRID_ROWS * 127 + 0.5)
+	end
 	setQlinkPosition(i, target)
 	qlinkCol = col
 	paintAll()
@@ -759,6 +817,9 @@ local function enterQlink()
 	qlinkPage = 0
 	qlinkCol = 0
 	qlinkTargetLogged = {}
+	qlinkFlip = {}
+	qlinkSeenStrings = {}
+	qlinkSeenPos = {}
 	log("qlink page")
 	paintAll()
 end
@@ -1060,7 +1121,8 @@ local function paintLeft()
 		quantizeAvailable and C.white[3] or C.off[3]
 	)
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
-	local pageColour = tempoMode and C.white or (swingMode and C.yellow or (qlinkMode and C.cyan or adjustColour()))
+	local pageColour = tempoMode and C.white
+		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkPage * GRID_COLS) or adjustColour()))
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -2095,7 +2157,13 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			end
 		elseif fn == "device" then
 			if qlinkMode then
-				exitQlink()
+				if qlinkPage == 0 then
+					qlinkPage = 1
+					log("qlink page 2")
+					paintAll()
+				else
+					exitQlink()
+				end
 			else
 				enterQlink()
 			end
