@@ -10,8 +10,9 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page are
-implemented and host-tested.
+track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page +
+the Shift transport buttons (loop/overdub/quantiser/automation filter), track navigation,
+plugin presets and the firmware probe are implemented and host-tested.
 
 ## What it does
 
@@ -22,9 +23,14 @@ implemented and host-tested.
 - **Scene launch**: right column CC 89-19 launches scene rows 0-7 (89 = top row, 19 = bottom).
   Shift + those = the label functions (patterns/steps/pattern settings/velocity/probability/
   mutation/micro step/print to clip).
-- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift moves by 8.
-- **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo.
+- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift + 80/70 moves by 8,
+  Shift + 91/92 = previous/next track.
+- **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo,
+  Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle,
+  Shift + 40 = quantiser on/off.
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
+  Shift + < / > (CC 91/92) = previous/next track; Shift + note/chord (CC 94/95) =
+  previous/next plugin preset on the current track.
 - **Function buttons**: CC 1-8 = record arm/mute/solo/volume/pan/sends/device/stop clip.
   Hold CC 1-3/8, then press a track button (CC 101-108) to apply it to that track.
   CC 4-6 open fader menus, CC 7 toggles the Q-Link page. Shift + CC 1/2/3/6/7/8 =
@@ -35,7 +41,9 @@ implemented and host-tested.
 - **Track controls**: press volume/pan/sends (CC 4/5/6) to open a fader menu aligned with
   the clip view; press a grid pad to set a track's value, up/down (CC 80/70, ±1/8) to
   nudge, and press the function button again to exit; tapping CC 6 cycles sends. Volume/pan/sends write `normalTracks[i].Volume/Pan/Send1-4.value`.
-- **Tempo/swing**: Shift + CC 6 = tap tempo; Shift + CC 7 = tempo page (BPM digits on the
+- **Tempo/swing**: Shift + CC 6 = tap tempo (native: while Shift is held CC 6 drives the
+  MPC's own Tap Tempo control and is restored to the script on Shift release; manual
+  averager fallback when that routing is missing); Shift + CC 7 = tempo page (BPM digits on the
   grid, up/down + hold to accelerate); Shift + CC 8 = swing page (swing % on the grid,
   50-75 where 50% is straight timing, up/down + hold to accelerate; reads/writes
   `sequencer.quantiser.GetSwing`/`SetSwing`).

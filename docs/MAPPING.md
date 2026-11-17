@@ -58,12 +58,14 @@ function is preserved (releasing the shift-function button does not clear it).
 | 3 | click/metronome | `sequencer.SetMetronomeEnabled(not MetronomeEnabled)` |
 | 4 | — | — |
 | 5 | — | — |
-| 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
+| 6 | tap tempo (Shift) | native: Shift press routes CC 6 to the MPC's own Tap Tempo control (`RemoveCCToScript` + `controlSurface.AddCCToControl(0, 6, "Tap Tempo")`), Shift release routes it back to the script; when that mapping is missing it falls back to averaging the last taps using `dev.timer.Now()` ms timestamps and setting integer `sequencer.SetBPM` |
 | 7 | tempo page (Shift) | Shift + CC 7 toggles the tempo page (unshifted CC 7 opens the Q-Link page instead); the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones white, tens orange, hundreds blue; blue/orange/white differ in hue and luminance for colourblind accessibility); up/down change BPM (hold accelerates) |
 | 8 | swing page (Shift) | toggles the swing page; the grid draws the swing % left-aligned as scaled 7-segment digits (same layout and colourblind-safe colours as the tempo page); up/down change swing by 1 (50-75, hold accelerates) |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
-leaves the surface working.
+leaves the surface working. The same guard covers the Shift transport buttons (loop,
+overdub, quantiser, automation filter), track navigation, plugin presets and the native
+tap tempo routing (the manual averager is the fallback when the routing is missing).
 
 ### Volume / pan / sends menus
 
@@ -161,11 +163,11 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | CC | Label | Script action |
 |---|---|---|
 | 90 | shift | shift modifier |
-| 91 | < | window left (`MoveLeft`); Shift = 8 |
-| 92 | > | window right (`MoveRight`); Shift = 8 |
+| 91 | < | window left (`MoveLeft`); Shift = previous track (`currentTrack.Previous`) |
+| 92 | > | window right (`MoveRight`); Shift = next track (`currentTrack.Next`) |
 | 93 | session | clip mode |
-| 94 | note | note mode (stub) |
-| 95 | chord | chord mode (stub) |
+| 94 | note | note mode (stub); Shift = previous plugin preset (`currentTrack.PrevPluginPreset`) |
+| 95 | chord | chord mode (stub); Shift = next plugin preset (`currentTrack.NextPluginPreset`) |
 | 96 | custom | custom mode (stub) |
 | 97 | sequencer | step mode (stub) |
 | 98 | projects/save | save (stub) |
@@ -174,10 +176,10 @@ Primary = row trigger (scene launch); Shift = the label functions.
 
 | CC | Label | Script action |
 |---|---|---|
-| 10 | record/capture midi | `sequencer.Record` |
-| 20 | play | `IsPlaying` ? `Stop` : `Play` |
-| 30 | fixed length | stub |
-| 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()` |
+| 10 | record/capture midi | `sequencer.Record`; Shift = overdub (`sequencer.Overdub`) |
+| 20 | play | `IsPlaying` ? `Stop` : `Play`; Shift = loop toggle (`sequencer.Loop.value`) |
+| 30 | fixed length | stub; Shift = cycle the global automation filter (`project.AdvanceGlobalAutomationFilterType`) |
+| 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()`; Shift = quantiser on/off (`sequencer.quantiser.Enabled.value`) |
 | 50 | duplicate/double | hold duplicate, press the origin clip pad, then one or more target clip pads (`clipMatrix.CopyClip`) |
 | 60 | clear | hold clear, press one or more clip pads (`clipMatrix.DeleteClip`) |
 | 70 | down | window down (`MoveDown`); Shift = 8 |

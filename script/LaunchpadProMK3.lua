@@ -1331,8 +1331,8 @@ local function updateTapTempoRouting(held)
 	local cs = dev.mappings and dev.mappings.controlSurface
 	if held and cs and type(cs.AddCCToControl) == "function" and type(cs.RemoveCCToControl) == "function" then
 		local ok = pcall(function()
-			m.RemoveCCToScript(0, LEFT.sends)
-			cs.AddCCToControl(0, LEFT.sends, "Tap Tempo")
+			m.RemoveCCToScript(0, TRACK.sends)
+			cs.AddCCToControl(0, TRACK.sends, "Tap Tempo")
 		end)
 		if ok then
 			nativeTap = true
@@ -1341,12 +1341,12 @@ local function updateTapTempoRouting(held)
 		end
 	end
 	if nativeTap then
-		call(cs.RemoveCCToControl, 0, LEFT.sends)
-		call(m.AddCCToScript, 0, LEFT.sends)
+		call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
+		call(m and m.AddCCToScript, 0, TRACK.sends)
 		nativeTap = false
 	elseif held then
 		-- a failed bind may have left CC 6 unregistered: keep it on the script
-		call(m.AddCCToScript, 0, LEFT.sends)
+		call(m and m.AddCCToScript, 0, TRACK.sends)
 	end
 	if held then
 		logOnce("tapmanual", "tap tempo: manual fallback")
@@ -2054,7 +2054,7 @@ function LaunchpadProMK3.OnUnload()
 		-- Shift was held: hand CC 6 back so the removal below unregisters the
 		-- routing OnLoad registered
 		local cs = dev.mappings and dev.mappings.controlSurface
-		call(cs and cs.RemoveCCToControl, 0, LEFT.sends)
+		call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
 		nativeTap = false
 	end
 	local m = dev.mappings and dev.mappings.script

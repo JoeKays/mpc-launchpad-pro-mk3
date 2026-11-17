@@ -72,7 +72,14 @@ assert_eq(mock.count("SetMetronomeEnabled"), 2, "metronome off")
 assert_eq(mock.find("SetMetronomeEnabled")[2].args[1], false, "metronome disabled")
 L.HandleMIDICC(0, 3, 0)
 
--- Shift + CC 6 = tap tempo: two taps 500 ms apart set 120 BPM.
+-- Shift + CC 6 = tap tempo. Native Tap Tempo routing is covered in
+-- test-buttons.lua; strip the controlSurface mapping so this section exercises
+-- the manual averager fallback (two taps 500 ms apart set 120 BPM).
+local savedControlSurface = mock.dev.mappings.controlSurface
+mock.dev.mappings.controlSurface = nil
+L.HandleMIDICC(0, 90, 0) -- shift off: give CC 6 back to the script
+L.HandleMIDICC(0, 90, 127) -- shift on without the mapping -> manual fallback
+assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: manual fallback", "tap tempo manual fallback")
 mock.setNow(0)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: first tap", "tap tempo first tap")
@@ -89,6 +96,7 @@ mock.setNow(5499)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(mock.find("SetBPM")[2].args[1], 120, "tap tempo rounds to int BPM")
 L.HandleMIDICC(0, 6, 0)
+mock.dev.mappings.controlSurface = savedControlSurface
 -- Shift + CC 7 = tempo page: up/down change BPM, holding accelerates.
 L.HandleMIDICC(0, 7, 127) -- enter tempo page
 assert_eq(lastLog(), "LaunchpadProMK3: tempo page: 120 BPM", "tempo page on")
@@ -125,10 +133,10 @@ L.HandleMIDICC(0, 70, 0)
 L.HandleMIDICC(0, 8, 127) -- exit swing page
 assert_eq(lastLog(), "LaunchpadProMK3: swing page off", "swing page off")
 L.HandleMIDICC(0, 8, 0)
+L.HandleMIDICC(0, 90, 0) -- shift off: the quantize press below is the plain one
 L.HandleMIDICC(0, 40, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "quantize applied")
 L.HandleMIDICC(0, 40, 0)
-L.HandleMIDICC(0, 90, 0)
 
 -- Degrade: a missing commandManager/sequencer leaves the shift functions inert,
 -- logs once, and does not crash.
