@@ -87,6 +87,7 @@ for i = 0, 7 do
 end
 
 -- sequencer
+local mockBpm = 120
 local sequencer = {
 	Play = function()
 		record("Play")
@@ -112,9 +113,10 @@ local sequencer = {
 	MetronomeEnabled = prop(false),
 	SetBPM = function(bpm)
 		record("SetBPM", bpm)
+		mockBpm = bpm
 	end,
 	GetBPM = function()
-		return 120
+		return mockBpm
 	end,
 }
 

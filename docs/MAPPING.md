@@ -31,7 +31,7 @@ and press it again to exit.
 | 4 | volume menu | — |
 | 5 | pan menu | — |
 | 6 | sends menu | tap again to cycle send 1-4 |
-| 7 | device (stub) | tempo (stub) |
+| 7 | tempo page (Shift) | tempo page: up/down change BPM, hold to accelerate |
 | 8 | stop clip | swing (stub) |
 
 Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or hold CC 8
@@ -58,7 +58,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 4 | — | — |
 | 5 | — | — |
 | 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
-| 7 | tempo (stub) | logs `tempo: TODO` |
+| 7 | tempo page (Shift) | toggles the tempo page; the grid shows the BPM as 2x5 digits, up/down change BPM (hold accelerates) |
 | 8 | swing (stub) | logs `swing: TODO` |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
@@ -153,7 +153,7 @@ working.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
-- Function buttons (CC 1-8): three states — off when the function is unavailable (e.g. device), a lighter grey when available, white when held/selected.
+- Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected.
 - Top row: current mode white, others dim; Shift white while held.
 - Left column: play green while playing, record red while recording; duplicate/clear white while available; up/down white while available and take the page colour while a fader menu is open (cyan volume, magenta pan, send colour). Fixed length and quantize are stubs and stay off.
 - Right column: current mode white, others dim; logo cyan in probe mode.

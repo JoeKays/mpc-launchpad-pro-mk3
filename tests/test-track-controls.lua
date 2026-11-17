@@ -29,11 +29,11 @@ end
 
 L.OnLoad()
 
--- Mapped function buttons CC 1-6 and CC 8 are available (lighter); CC 7 is off.
+-- Mapped function buttons CC 1-8 are available (lighter).
 for cc = 1, 6 do
 	assert_eq(mock.leds[cc][1], 60, "function button " .. cc .. " available")
 end
-assert_eq(mock.leds[7][1], 0, "device button off")
+assert_eq(mock.leds[7][1], 60, "tempo button available")
 assert_eq(mock.leds[8][1], 60, "stopClip button available")
 
 -- Volume menu: press CC 4.

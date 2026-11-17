@@ -89,8 +89,26 @@ mock.setNow(5499)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(mock.find("SetBPM")[2].args[1], 120, "tap tempo rounds to int BPM")
 L.HandleMIDICC(0, 6, 0)
-L.HandleMIDICC(0, 7, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: tempo: TODO", "tempo stub")
+-- Shift + CC 7 = tempo page: up/down change BPM, holding accelerates.
+L.HandleMIDICC(0, 7, 127) -- enter tempo page
+assert_eq(lastLog(), "LaunchpadProMK3: tempo page: 120 BPM", "tempo page on")
+L.HandleMIDICC(0, 7, 0)
+L.HandleMIDICC(0, 80, 127) -- up: +1 BPM
+assert_eq(mock.find("SetBPM")[3].args[1], 121, "tempo up")
+L.HandleMIDICC(0, 80, 0)
+L.HandleMIDICC(0, 70, 127) -- down: -1 BPM
+assert_eq(mock.find("SetBPM")[4].args[1], 120, "tempo down")
+L.HandleMIDICC(0, 70, 0)
+-- holding up auto-repeats (accelerating after a short delay)
+L.HandleMIDICC(0, 80, 127)
+local before = mock.count("SetBPM")
+for _ = 1, 20 do
+	L.HandleTimer()
+end
+assert(mock.count("SetBPM") > before + 1, "tempo hold auto-repeats")
+L.HandleMIDICC(0, 80, 0)
+L.HandleMIDICC(0, 7, 127) -- exit tempo page
+assert_eq(lastLog(), "LaunchpadProMK3: tempo page off", "tempo page off")
 L.HandleMIDICC(0, 7, 0)
 L.HandleMIDICC(0, 8, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: swing: TODO", "swing stub")

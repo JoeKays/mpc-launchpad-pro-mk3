@@ -142,6 +142,9 @@ local adjustCol = 0 -- last grid column touched in the menu (for up/down nudges)
 local lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 local clipOp = nil -- nil / "duplicate" / "clear"
 local clipOrigin = nil -- {col, row} for duplicate
+local tempoMode = false -- Shift+CC7 tempo page: up/down change BPM
+local tempoHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
+local tempoHoldTicks = 0 -- ticks since the tempo button was pressed
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
@@ -412,6 +415,48 @@ end
 -- Painting
 -----------------------------------------------------------------------------------------------
 
+-- 2x5 digit font for the tempo page. Each digit is two columns wide and five
+-- rows tall; three digits plus two one-column gaps fill the 8-column grid.
+local DIGIT_FONT = {
+	["0"] = { "11", "10", "10", "10", "11" },
+	["1"] = { "01", "01", "01", "01", "01" },
+	["2"] = { "11", "01", "11", "10", "11" },
+	["3"] = { "11", "01", "11", "01", "11" },
+	["4"] = { "10", "10", "11", "01", "01" },
+	["5"] = { "11", "10", "11", "01", "11" },
+	["6"] = { "11", "10", "11", "10", "11" },
+	["7"] = { "11", "01", "01", "01", "01" },
+	["8"] = { "11", "11", "11", "11", "11" },
+	["9"] = { "11", "10", "11", "01", "11" },
+}
+
+local function paintTempoGrid()
+	local bpm = math.floor(call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
+	bpm = math.max(0, math.min(999, bpm))
+	local text = string.format("%3d", bpm)
+	-- clear the whole grid first; the digits only occupy rows 2..6
+	for row = 0, GRID_ROWS - 1 do
+		for col = 0, GRID_COLS - 1 do
+			ledOff(10 * (8 - row) + col + 1)
+		end
+	end
+	for i = 1, 3 do
+		local pattern = DIGIT_FONT[text:sub(i, i)]
+		local baseCol = (i - 1) * 3
+		for r = 1, 5 do
+			local padRow = 7 - r -- rows 2..6, centred vertically
+			for c = 1, 2 do
+				local idx = 10 * (8 - padRow) + (baseCol + c - 1) + 1
+				if pattern and pattern[r]:sub(c, c) == "1" then
+					ledRGB(idx, C.white[1], C.white[2], C.white[3])
+				else
+					ledOff(idx)
+				end
+			end
+		end
+	end
+end
+
 local function paintAdjustGrid()
 	local colour = C.cyan
 	if adjustMode == "pan" then
@@ -457,6 +502,10 @@ local function paintAdjustGrid()
 end
 
 local function paintGrid()
+	if tempoMode then
+		paintTempoGrid()
+		return
+	end
 	if adjustMode then
 		paintAdjustGrid()
 		return
@@ -510,14 +559,14 @@ local function paintTrack()
 	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
 	local function fnAvailable(fn)
 		if fn == "device" then
-			return false -- stub, no device page yet
+			return mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil
 		elseif fn == "stopClip" then
 			return aperture ~= nil and aperture.StopClipsOnTrack ~= nil
 		end
 		return mpc.tracks ~= nil
 	end
 	local function fnColour(fn)
-		if heldFunction == fn or adjustMode == fn then
+		if heldFunction == fn or adjustMode == fn or (fn == "device" and tempoMode) then
 			return C.white
 		elseif fnAvailable(fn) then
 			return C.available
@@ -619,8 +668,8 @@ local function paintLeft()
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
 	ledOff(LEFT.fixedLength)
 	ledOff(LEFT.quantize)
-	local nudgeOn = adjustMode ~= nil
-	local pageColour = adjustColour()
+	local nudgeOn = adjustMode ~= nil or tempoMode
+	local pageColour = tempoMode and C.white or adjustColour()
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -877,6 +926,17 @@ local function setTrackVolumeDB(idx, db)
 	setTrackValue(idx, "Volume", dbToGain(db))
 end
 
+local function changeTempo(delta)
+	local sq = mpc.sequencer
+	local bpm = call(sq and sq.GetBPM) or 120
+	bpm = math.max(20, math.min(300, math.floor(bpm + delta + 0.5)))
+	call(sq and sq.SetBPM, bpm)
+	log("tempo: " .. bpm .. " BPM")
+	paintGrid()
+	paintLeft()
+	flushLEDs()
+end
+
 local function nudgeAdjust(delta)
 	if not adjustMode then
 		return
@@ -907,6 +967,7 @@ local function nudgeAdjust(delta)
 end
 
 local function enterAdjust(newMode)
+	tempoMode = false
 	adjustMode = newMode
 	adjustCol = 0
 	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
@@ -1030,7 +1091,16 @@ local function doShiftFunction(fn)
 	elseif fn == "sends" then
 		doTapTempo()
 	elseif fn == "device" then
-		log("tempo: TODO")
+		adjustMode = nil
+		tempoMode = not tempoMode
+		tempoHold = nil
+		if tempoMode then
+			log("tempo page: " .. tostring(call(mpc.sequencer and mpc.sequencer.GetBPM)) .. " BPM")
+		else
+			log("tempo page off")
+		end
+		paintAll()
+		flushLEDs()
 	elseif fn == "stopClip" then
 		log("swing: TODO")
 	else
@@ -1130,7 +1200,7 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 				end
 			elseif adjustMode then
 				handleAdjustPad(col, row)
-			else
+			elseif not tempoMode then
 				doClip(col, row)
 			end
 		end
@@ -1162,6 +1232,10 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			clipOrigin = nil
 			paintAll()
 			flushLEDs()
+		end
+		-- releasing the tempo up/down button stops the auto-repeat
+		if cc == LEFT.up or cc == LEFT.down then
+			tempoHold = nil
 		end
 		local fn = TRACK_FN[cc]
 		-- only the button that is actually held clears the hold; releasing a
@@ -1214,6 +1288,12 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if cc == TOP.right then
 		moveWindow("right", shift and 8 or 1)
+		return
+	end
+	if tempoMode and (cc == LEFT.up or cc == LEFT.down) then
+		tempoHold = cc
+		tempoHoldTicks = 0
+		changeTempo(cc == LEFT.up and 1 or -1)
 		return
 	end
 	if adjustMode and (cc == LEFT.up or cc == LEFT.down) then
@@ -1330,6 +1410,14 @@ function LaunchpadProMK3.HandleTimer()
 	-- timer runs at 50 ms; blink at 2 Hz (every 5 ticks) and full repaint every 2 s
 	if ticks % 5 == 0 then
 		blinkOn = not blinkOn
+	end
+	-- tempo page: holding up/down repeats, accelerating after a short delay
+	if tempoMode and tempoHold then
+		tempoHoldTicks = tempoHoldTicks + 1
+		local interval = tempoHoldTicks < 10 and 6 or (tempoHoldTicks < 20 and 3 or 1)
+		if tempoHoldTicks % interval == 0 then
+			changeTempo(tempoHold == LEFT.up and 1 or -1)
+		end
 	end
 	if layoutQuerySent and not programmerEntered and ticks >= 1 then
 		sendLayout(0x11, 0)
