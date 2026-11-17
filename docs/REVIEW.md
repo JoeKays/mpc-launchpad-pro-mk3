@@ -115,3 +115,16 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
 3. **Track device** (CC 7) remains a stub; Q-links are a later phase.
 4. **Clip edits**: quantize (CC 40), note editing on the selected clip.
 5. **Stop all clips**: a dedicated button (`clipMatrix.StopAllClips`).
+
+## 11. Clip-grid lane: live states, listeners, follow current track
+
+| Item | Verdict | Evidence |
+|---|---|---|
+| Clip state colours (`clipProperties[col][row]` Colour/State/Selected, device-verified) | PASS | `paintClipSlot`: < 2 empty (selected = dim white 60,60,60), 2 = clip colour solid (alpha ignored), 3-5 green, >= 6 red |
+| Fast/slow blink rendering | PASS | `CLIP_BLINK_FAST` + `blinkPhase`: fast = 2 Hz `blinkOn`, slow = 1 Hz via ticks; dim repaint instead of a hardware blink channel |
+| Slot listeners 8x8 x Colour/State/Selected (192) | PASS | `listenGrid`; every listen/stopListening wrapped in `pcall`; callbacks wrapped by `repaintFn` (pcall inside, logs `listener error` once via `logOnce`) |
+| Rebind on window moves | PASS | `moveWindow` calls `listenGrid`; the follow path rebinds too |
+| Follow current track | PASS | `followCurrentTrack`: guarded `SetActiveMatrix("Normal"/"Master")` + `MoveToColumn(index)` / `(index - SizeNormalTracks)`; `currentTrack.Index` listener; initial alignment at load (MPK pattern) |
+| removeListeners stops everything incl. currentTrack.Index | PASS | `stopProps(gridListeners)` + `stopProps(listeners)`; `currentTrack.Index` is registered into `listeners` |
+| Timer fallback kept (degrade) | PASS | `HandleTimer` still repaints and resends every 2 s; `paintClipSlot` returns false without a State property -> `clipStatus` polling per pad |
+| Tests | PASS | `tests/test-clip.lua` (state colour, all listeners stopped on unload), `tests/test-clip-live.lua` (state colours, blink phases, listener-driven repaint, rebind on move, follow Normal/Master + MoveToColumn) |

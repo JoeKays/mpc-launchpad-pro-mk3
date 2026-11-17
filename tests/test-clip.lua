@@ -30,6 +30,10 @@ for i = 11, 88 do
 end
 assert(painted >= 64, "grid painted")
 
+-- clip states: the mock's slots are State 2 (stopped) with colour 0xFF0000 ->
+-- the top-left slot (clip row 0) shows the clip's own colour, solid
+assert_eq(mock.leds[81][1], 127, "stopped clip shows its own colour (red)")
+
 -- pad press -> TriggerClip(0,0)
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "TriggerClip")
@@ -72,5 +76,7 @@ assert(mock.count("SendMIDISysex") >= 1, "sysex sent")
 L.OnUnload()
 assert_eq(mock.count("timer.Stop"), 1, "timer.Stop")
 assert_eq(mock.count("Hide"), 1, "Hide")
+-- every listener stopped: 192 slots + scene/track/sequencer + currentTrack.Index
+assert(mock.count("stopListening") >= 228, "removeListeners stops all listeners")
 
 print("test-clip: PASS")

@@ -10,20 +10,26 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize are implemented
-and host-tested.
+track volume/pan/sends + tap tempo + tempo page + swing page + quantize + live clip
+states (listener-driven LEDs, current-track follow) are implemented and host-tested.
 Track device and Q-links are stubbed for later phases.
 
 ## What it does
 
 - **Clip mode**: the 8x8 grid is a window onto the MPC clip matrix. Pad press launches the
-  clip under it; Shift+pad selects it without launching. Clip colours follow the MPC state
-  (dim stopped, bright playing, blink queued). The bottom-left pad maps to MPC row 7 (bottom);
-  the top-left pad maps to MPC row 0 (top).
+  clip under it; Shift+pad selects it without launching. LEDs show the live clip state via
+  property listeners (no polling): empty slots dark (selected = dim white), stopped clips
+  in their own colour (solid), playing/queued green, recording red; transitions blink fast
+  (2 Hz), playing/recording blink slow (1 Hz). The bottom-left pad maps to MPC row 7
+  (bottom); the top-left pad maps to MPC row 0 (top).
 - **Scene launch**: right column CC 89-19 launches scene rows 0-7 (89 = top row, 19 = bottom).
   Shift + those = the label functions (patterns/steps/pattern settings/velocity/probability/
   mutation/micro step/print to clip).
-- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift moves by 8.
+- **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift moves by 8. Scrolling
+  re-registers the slot listeners for the new window.
+- **Follow current track**: the grid follows MPC's current track (`currentTrack.Index`
+  listener moves the window; the master track shows the Master matrix). The track row
+  (CC 101-108) selects tracks, so the grid follows track selection.
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo.
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
 - **Function buttons**: CC 1-8 = record arm/mute/solo/volume/pan/sends/device/stop clip.

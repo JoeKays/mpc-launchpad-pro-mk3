@@ -574,6 +574,54 @@ local function paintAdjustGrid()
 	end
 end
 
+-- Clip states that blink: the MPK's fast set (transitions); other states > 3
+-- (playing/recording/overdubbing) blink slowly. RGB pads have no blink channel
+-- in the sysex we use, so blinking repaints the pad dim on the timer phase:
+-- fast = the 2 Hz blinkOn, slow = 1 Hz via ticks.
+local CLIP_BLINK_FAST = { [3] = true, [5] = true, [6] = true, [8] = true, [9] = true, [11] = true }
+
+local function blinkPhase(fast)
+	if fast then
+		return blinkOn
+	end
+	return ticks % 10 < 5
+end
+
+-- One clip slot from its live property State (MPK semantics, device-verified):
+-- < 2 empty, 2 = stopped (the clip's Colour, alpha ignored), 3-5 = playing or
+-- queued (green), >= 6 = recording (red). Selected empty slots light dim white
+-- (ring substitute). Returns false when the slot has no State property, so the
+-- caller falls back to polling clipMatrix for that pad.
+local function paintClipSlot(col, row)
+	local p = clipProps and clipProps[col] and clipProps[col][row]
+	local state = tonumber(propValue(p, "State"))
+	if state == nil then
+		return false
+	end
+	local idx = 10 * (8 - row) + col + 1
+	if state < 2 then
+		if propValue(p, "Selected") == true then
+			ledRGB(idx, C.available[1], C.available[2], C.available[3])
+		else
+			ledOff(idx)
+		end
+		return true
+	end
+	local r, g, b
+	if state >= 6 then
+		r, g, b = C.red[1], C.red[2], C.red[3]
+	elseif state >= 3 then
+		r, g, b = C.green[1], C.green[2], C.green[3]
+	else
+		r, g, b = argb(clipColour(col, row))
+	end
+	if state >= 3 and not blinkPhase(CLIP_BLINK_FAST[state]) then
+		r, g, b = scale7(r * 0.18), scale7(g * 0.18), scale7(b * 0.18)
+	end
+	ledRGB(idx, r, g, b)
+	return true
+end
+
 local function paintGrid()
 	if tempoMode then
 		paintTempoGrid()
@@ -590,21 +638,24 @@ local function paintGrid()
 	for row = 0, GRID_ROWS - 1 do
 		for col = 0, GRID_COLS - 1 do
 			local idx = 10 * (8 - row) + col + 1
-			local status = clipStatus(col, row)
-			if status == 0 then
-				ledOff(idx)
-			else
-				local c = clipColour(col, row)
-				local r, g, b = argb(c)
-				local k = 1.0
-				if status == 1 then
-					k = 0.18
-				elseif status == 3 then
-					k = blinkOn and 0.9 or 0.18
-				elseif status == 2 then
-					k = 0.95
+			if not (clipProps and paintClipSlot(col, row)) then
+				-- polling fallback: clipProperties missing or a slot without State
+				local status = clipStatus(col, row)
+				if status == 0 then
+					ledOff(idx)
+				else
+					local c = clipColour(col, row)
+					local r, g, b = argb(c)
+					local k = 1.0
+					if status == 1 then
+						k = 0.18
+					elseif status == 3 then
+						k = blinkOn and 0.9 or 0.18
+					elseif status == 2 then
+						k = 0.95
+					end
+					ledRGB(idx, scale7(r * k), scale7(g * k), scale7(b * k))
 				end
-				ledRGB(idx, scale7(r * k), scale7(g * k), scale7(b * k))
 			end
 		end
 	end
@@ -799,45 +850,99 @@ end
 -- Listeners
 -----------------------------------------------------------------------------------------------
 
-local listeners = {}
+local listeners = {} -- every property listened to; stopped by removeListeners
+local gridListeners = {} -- the current window's clip slots; rebound on window moves
 
-local function listen(prop, fn)
+local function listen(prop, fn, store)
 	if prop and type(prop.listen) == "function" then
 		local ok = pcall(function()
 			prop:listen(fn, deviceName)
 		end)
 		if ok then
-			listeners[#listeners + 1] = prop
+			local target = store or listeners
+			target[#target + 1] = prop
 		end
 	end
 end
 
-local function listenAll()
-	if clipProps then
-		for col = 0, GRID_COLS - 1 do
-			for row = 0, GRID_ROWS - 1 do
-				local p = clipProps[col] and clipProps[col][row]
-				if p then
-					listen(p.Colour, function()
-						paintGrid()
-						flushLEDs()
-					end)
-					listen(p.State, function()
-						paintGrid()
-						flushLEDs()
-					end)
-				end
+-- Wrap a repaint so a failing listener callback can never break MPC's dispatch.
+local function repaintFn(fn)
+	return function(...)
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			logOnce("listenererror", "listener error: " .. tostring(err))
+		end
+	end
+end
+
+local function stopProps(props)
+	for _, prop in ipairs(props) do
+		if prop and type(prop.stopListening) == "function" then
+			pcall(function()
+				prop:stopListening(deviceName)
+			end)
+		end
+	end
+end
+
+-- (Re-)register the 8x8 slot listeners: Colour/State/Selected -> full grid
+-- repaint (MPK-style, so blink phases stay in sync). The aperture's
+-- clipProperties follow the window, so every window move rebinds.
+local function listenGrid()
+	stopProps(gridListeners)
+	gridListeners = {}
+	if not clipProps then
+		return
+	end
+	for col = 0, GRID_COLS - 1 do
+		for row = 0, GRID_ROWS - 1 do
+			local p = clipProps[col] and clipProps[col][row]
+			if p then
+				local repaint = repaintFn(function()
+					paintGrid()
+					flushLEDs()
+				end)
+				listen(p.Colour, repaint, gridListeners)
+				listen(p.State, repaint, gridListeners)
+				listen(p.Selected, repaint, gridListeners)
 			end
 		end
 	end
+end
+
+-- Follow MPC's current track: move the aperture window to that track's column
+-- (Master matrix for the master track), then rebind the slot listeners for the
+-- new window and repaint. The track row (CC 101-108) selects MPC's current
+-- track, so the grid follows track selection too.
+local function followCurrentTrack(index)
+	if aperture and type(index) == "number" then
+		local normalCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
+		if index >= normalCount then
+			call(aperture.SetActiveMatrix, "Master")
+			call(aperture.MoveToColumn, index - normalCount)
+		else
+			call(aperture.SetActiveMatrix, "Normal")
+			call(aperture.MoveToColumn, index)
+		end
+		log("follow current track " .. tostring(index))
+	end
+	listenGrid()
+	padCache = {}
+	paintAll()
+end
+
+local function listenAll()
 	if aperture and aperture.sceneProperties then
 		for row = 0, 7 do
 			local p = aperture.sceneProperties[row]
 			if p then
-				listen(p.State, function()
-					paintScene()
-					flushLEDs()
-				end)
+				listen(
+					p.State,
+					repaintFn(function()
+						paintScene()
+						flushLEDs()
+					end)
+				)
 			end
 		end
 	end
@@ -846,46 +951,43 @@ local function listenAll()
 		for i = 0, 7 do
 			local t = tracks[i]
 			if t then
-				listen(t.Mute, function()
+				local repaint = repaintFn(function()
 					paintTrack()
 					flushLEDs()
 				end)
-				listen(t.Solo, function()
-					paintTrack()
-					flushLEDs()
-				end)
-				listen(t.RecArm, function()
-					paintTrack()
-					flushLEDs()
-				end)
+				listen(t.Mute, repaint)
+				listen(t.Solo, repaint)
+				listen(t.RecArm, repaint)
 			end
 		end
 	end
 	local sq = mpc.sequencer
 	if sq then
-		listen(sq.Playing, function()
+		local repaint = repaintFn(function()
 			paintLeft()
 			flushLEDs()
 		end)
-		listen(sq.RecordState, function()
-			paintLeft()
-			flushLEDs()
-		end)
-		listen(sq.OverdubState, function()
-			paintLeft()
-			flushLEDs()
-		end)
+		listen(sq.Playing, repaint)
+		listen(sq.RecordState, repaint)
+		listen(sq.OverdubState, repaint)
 	end
+	local ct = mpc.tracks and mpc.tracks.currentTrack
+	if ct then
+		listen(
+			ct.Index,
+			repaintFn(function(newIndex)
+				followCurrentTrack(newIndex)
+			end)
+		)
+	end
+	-- align the window with the current track (also registers the slot listeners)
+	followCurrentTrack(propValue(ct, "Index"))
 end
 
 local function removeListeners()
-	for _, prop in ipairs(listeners) do
-		if prop and type(prop.stopListening) == "function" then
-			pcall(function()
-				prop:stopListening(deviceName)
-			end)
-		end
-	end
+	stopProps(gridListeners)
+	gridListeners = {}
+	stopProps(listeners)
 	listeners = {}
 end
 
@@ -1263,6 +1365,7 @@ local function moveWindow(dir, n)
 		call(aperture[fn], n)
 		log(fn .. "(" .. n .. ")")
 		padCache = {}
+		listenGrid() -- the slot properties follow the window: rebind, then repaint
 		paintAll()
 	end
 end
