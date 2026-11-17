@@ -76,8 +76,9 @@ L.HandleMIDICC(0, 3, 0)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: first tap", "tap tempo first tap")
 L.HandleMIDICC(0, 6, 0)
-L.HandleTimer()
-L.HandleTimer() -- 2 ticks = 500 ms
+for _ = 1, 10 do
+	L.HandleTimer()
+end -- 10 ticks = 500 ms at 50 ms/tick
 L.HandleMIDICC(0, 6, 127)
 assert_eq(mock.count("SetBPM"), 1, "tap tempo SetBPM")
 assert_eq(mock.find("SetBPM")[1].args[1], 120, "tap tempo 120 BPM")

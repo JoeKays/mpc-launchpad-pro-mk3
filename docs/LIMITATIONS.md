@@ -34,7 +34,7 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. Volume writes `VolumeDB` (dB) with a `Volume` fallback; sends 1-4 use different colours. |
 | **Stop clip** | Hold CC 8 + a track button (CC 101-108) or a clip pad stops that track's clips (`aperture.StopClipsOnTrack`); the clip pad does not launch while stop clip is held. |
 | **Empty tracks** | Fader menus only light tracks below `mpc.tracks.SizeNormalTracks`; empty tracks stay dark. |
-| **Swing/tap tempo/tempo** | Shift + CC 6 = tap tempo (averages the last taps and sets `sequencer.SetBPM`; 250 ms timer resolution); Shift + CC 7/8 = tempo/swing stubs with `TODO` logs. |
+| **Swing/tap tempo/tempo** | Shift + CC 6 = tap tempo (averages the last taps and sets `sequencer.SetBPM`; 50 ms timer resolution); Shift + CC 7/8 = tempo/swing stubs with `TODO` logs. |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome, Shift + CC 6 = tap tempo; Shift + CC 7/8 = tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
 | **CC 30 (fixed length)** | Registered, but absent from the learn artifact; may not arrive. |

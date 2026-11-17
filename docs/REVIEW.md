@@ -64,7 +64,7 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
 | RGB type 3, 0-127 | PASS | `ledRGB` clamps 0-127 |
 | Cache per index | PASS | `padCache` |
 | One message per paint cycle | PASS | `flushLEDs` sends once |
-| Full repaint every 2 s | PASS | `HandleTimer` resets `padCache` every 8 ticks |
+| Full repaint every 2 s | PASS | `HandleTimer` resets `padCache` every 40 ticks (50 ms tick) |
 
 ## 6. Degrade-never-break
 

@@ -142,7 +142,7 @@ local adjustCol = 0 -- last grid column touched in the menu (for up/down nudges)
 local lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
 local clipOp = nil -- nil / "duplicate" / "clear"
 local clipOrigin = nil -- {col, row} for duplicate
-local tapTicks = {} -- recent tap-tempo tick timestamps (250 ms per tick)
+local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
 local layoutQuerySent = false
@@ -960,8 +960,8 @@ end
 -- Tap tempo: average the last few tap intervals (timer runs at 250 ms).
 local function doTapTempo()
 	local now = ticks
-	-- a gap longer than 2 s starts a new tap sequence
-	if #tapTicks > 0 and now - tapTicks[#tapTicks] > 8 then
+	-- a gap longer than 2 s (40 ticks) starts a new tap sequence
+	if #tapTicks > 0 and now - tapTicks[#tapTicks] > 40 then
 		tapTicks = {}
 	end
 	tapTicks[#tapTicks + 1] = now
@@ -977,7 +977,7 @@ local function doTapTempo()
 		total = total + (tapTicks[i] - tapTicks[i - 1])
 	end
 	local avgTicks = total / (#tapTicks - 1)
-	local bpm = math.floor(240 / avgTicks + 0.5)
+	local bpm = math.floor(1200 / avgTicks + 0.5)
 	bpm = math.max(20, math.min(300, bpm))
 	local sq = mpc.sequencer
 	if sq and type(sq.SetBPM) == "function" then
@@ -1314,7 +1314,10 @@ end
 
 function LaunchpadProMK3.HandleTimer()
 	ticks = ticks + 1
-	blinkOn = not blinkOn
+	-- timer runs at 50 ms; blink at 2 Hz (every 5 ticks) and full repaint every 2 s
+	if ticks % 5 == 0 then
+		blinkOn = not blinkOn
+	end
 	if layoutQuerySent and not programmerEntered and ticks >= 1 then
 		sendLayout(0x11, 0)
 		programmerEntered = true
@@ -1337,7 +1340,7 @@ function LaunchpadProMK3.HandleTimer()
 			end
 		end
 	end
-	if ticks % 8 == 0 then
+	if ticks % 40 == 0 then
 		padCache = {}
 	end -- resend everything every 2 s
 	paintAll()
@@ -1435,7 +1438,7 @@ function LaunchpadProMK3.OnLoad()
 
 	listenAll()
 	paintAll()
-	call(dev.timer and dev.timer.Start, 250)
+	call(dev.timer and dev.timer.Start, 50)
 	log("loaded")
 end
 
