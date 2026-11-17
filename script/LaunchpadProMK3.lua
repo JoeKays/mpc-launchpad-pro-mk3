@@ -957,11 +957,23 @@ end
 -- Shift + a function button: the shift function (undo/redo/click/tap/tempo/swing).
 -- Shift is checked before the held-function state, so these run even while another
 -- function button is held; the held function is left untouched.
--- Tap tempo: average the last few tap intervals (timer runs at 250 ms).
+-- Tap tempo: use dev.timer.Now() (ms, high resolution) and average the last
+-- few tap intervals. Falls back to the 50 ms timer tick if Now() is missing.
 local function doTapTempo()
-	local now = ticks
-	-- a gap longer than 2 s (40 ticks) starts a new tap sequence
-	if #tapTicks > 0 and now - tapTicks[#tapTicks] > 40 then
+	local now = call(dev.timer and dev.timer.Now)
+	local useMs = type(now) == "number"
+	if not useMs then
+		now = ticks
+	end
+	local function diff(a, b)
+		local d = a - b
+		if useMs and d < 0 then
+			d = d + 4294967296 -- 32-bit wrap
+		end
+		return d
+	end
+	-- a gap longer than 2 s starts a new tap sequence
+	if #tapTicks > 0 and diff(now, tapTicks[#tapTicks]) > (useMs and 2000 or 40) then
 		tapTicks = {}
 	end
 	tapTicks[#tapTicks + 1] = now
@@ -974,15 +986,16 @@ local function doTapTempo()
 	end
 	local total = 0
 	for i = 2, #tapTicks do
-		total = total + (tapTicks[i] - tapTicks[i - 1])
+		total = total + diff(tapTicks[i], tapTicks[i - 1])
 	end
-	local avgTicks = total / (#tapTicks - 1)
-	local bpm = math.floor(1200 / avgTicks + 0.5)
+	local avg = total / (#tapTicks - 1)
+	local bpm = (useMs and 60000 or 1200) / avg
 	bpm = math.max(20, math.min(300, bpm))
+	bpm = math.floor(bpm + 0.5) -- MPC BPM is an integer
 	local sq = mpc.sequencer
 	if sq and type(sq.SetBPM) == "function" then
 		call(sq.SetBPM, bpm)
-		log("tap tempo: " .. bpm .. " BPM")
+		log(string.format("tap tempo: %d BPM (%.1f ms)", bpm, avg))
 	else
 		logOnce("tapbpm", "tap tempo unavailable: sequencer.SetBPM missing")
 	end

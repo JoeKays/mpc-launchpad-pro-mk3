@@ -57,7 +57,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 3 | click/metronome | `sequencer.SetMetronomeEnabled(not MetronomeEnabled)` |
 | 4 | — | — |
 | 5 | — | — |
-| 6 | tap tempo (Shift) | averages the last taps and sets `sequencer.SetBPM` |
+| 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
 | 7 | tempo (stub) | logs `tempo: TODO` |
 | 8 | swing (stub) | logs `swing: TODO` |
 

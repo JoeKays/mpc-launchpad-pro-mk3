@@ -73,15 +73,21 @@ assert_eq(mock.find("SetMetronomeEnabled")[2].args[1], false, "metronome disable
 L.HandleMIDICC(0, 3, 0)
 
 -- Shift + CC 6 = tap tempo: two taps 500 ms apart set 120 BPM.
+mock.setNow(0)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: tap tempo: first tap", "tap tempo first tap")
 L.HandleMIDICC(0, 6, 0)
-for _ = 1, 10 do
-	L.HandleTimer()
-end -- 10 ticks = 500 ms at 50 ms/tick
+mock.setNow(500)
 L.HandleMIDICC(0, 6, 127)
 assert_eq(mock.count("SetBPM"), 1, "tap tempo SetBPM")
 assert_eq(mock.find("SetBPM")[1].args[1], 120, "tap tempo 120 BPM")
+-- A 499 ms interval gives 120.24 BPM, rounded to the integer 120.
+mock.setNow(5000)
+L.HandleMIDICC(0, 6, 127) -- gap > 2 s resets the sequence
+L.HandleMIDICC(0, 6, 0)
+mock.setNow(5499)
+L.HandleMIDICC(0, 6, 127)
+assert_eq(mock.find("SetBPM")[2].args[1], 120, "tap tempo rounds to int BPM")
 L.HandleMIDICC(0, 6, 0)
 L.HandleMIDICC(0, 7, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: tempo: TODO", "tempo stub")

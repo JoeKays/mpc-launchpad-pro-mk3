@@ -278,12 +278,16 @@ local midiOut = {
 }
 
 -- timer
+local mockNow = 0
 local timer = {
 	Start = function(ms)
 		record("timer.Start", ms)
 	end,
 	Stop = function()
 		record("timer.Stop")
+	end,
+	Now = function()
+		return mockNow
 	end,
 }
 
@@ -331,6 +335,9 @@ M.commandManager = commandManager
 M.force = force
 M.midiOut = midiOut
 M.timer = timer
+function M.setNow(n)
+	mockNow = n
+end
 
 function M.reset()
 	M.calls = {}
