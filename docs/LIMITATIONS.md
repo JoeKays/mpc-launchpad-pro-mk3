@@ -28,14 +28,15 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Track device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
-| **Save/quantize** | Stubbed with `TODO` logs. |
+| **Save** | Stubbed with a `TODO` log. |
+| **Quantize** | CC 40 applies quantize via `mpc.controlSurface.quantizeApply.Press()`/`Release()`; the quantize button is white when the control exists. The quantize settings live on `mpc.sequencer.quantiser` (`SetEnabled`, `SetStrength`, `SetTimeDivision`, `SetWindow`, `SetShift`, `SetSwing`). |
 | **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |
 | **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
 | **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. Volume writes `VolumeDB` (dB) with a `Volume` fallback; sends 1-4 use different colours. |
 | **Stop clip** | Hold CC 8 + a track button (CC 101-108) or a clip pad stops that track's clips (`aperture.StopClipsOnTrack`); the clip pad does not launch while stop clip is held. |
 | **Empty tracks** | Fader menus only light tracks below `mpc.tracks.SizeNormalTracks`; empty tracks stay dark. |
-| **Swing/tap tempo/tempo** | Shift + CC 6 = tap tempo (uses `dev.timer.Now()` millisecond timestamps, averages the last 5 taps, sets integer `sequencer.SetBPM`); Shift + CC 7 = tempo page (grid draws the BPM left-aligned as scaled 7-segment digits, coloured by position: ones white, tens orange, hundreds blue — blue/orange/white differ in hue and luminance for colourblind accessibility; up/down change BPM, hold accelerates); Shift + CC 8 = swing stub with a `TODO` log. |
-| **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome, Shift + CC 6 = tap tempo, Shift + CC 7 = tempo page; Shift + CC 8 = swing stub. Shift functions work while a function button is held; the held function is preserved. |
+| **Swing/tap tempo/tempo** | Shift + CC 6 = tap tempo (uses `dev.timer.Now()` millisecond timestamps, averages the last 5 taps, sets integer `sequencer.SetBPM`); Shift + CC 7 = tempo page (grid draws the BPM left-aligned as scaled 7-segment digits, coloured by position: ones white, tens orange, hundreds blue — blue/orange/white differ in hue and luminance for colourblind accessibility; up/down change BPM, hold accelerates); Shift + CC 8 = swing page (same 7-segment renderer, `quantiser.GetSwing`/`SetSwing` 50-75 — 50% is straight timing, up/down change swing, hold accelerates). |
+| **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome, Shift + CC 6 = tap tempo, Shift + CC 7 = tempo page, Shift + CC 8 = swing page. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
 | **CC 30 (fixed length)** | Registered, but absent from the learn artifact; may not arrive. |
 | **LPP3 mode** | The script enters Programmer mode automatically (layout query + select 0x11) and restores the prior layout on unload. |

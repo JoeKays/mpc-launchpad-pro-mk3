@@ -145,6 +145,9 @@ local clipOrigin = nil -- {col, row} for duplicate
 local tempoMode = false -- Shift+CC7 tempo page: up/down change BPM
 local tempoHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
 local tempoHoldTicks = 0 -- ticks since the tempo button was pressed
+local swingMode = false -- Shift+CC8 swing page: up/down change swing
+local swingHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
+local swingHoldTicks = 0 -- ticks since the swing button was pressed
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
@@ -481,9 +484,8 @@ local function drawDigit(ch, x0, y0, w, h, colour)
 	end
 end
 
-local function paintTempoGrid()
-	local bpm = math.floor(call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
-	bpm = math.max(0, math.min(999, bpm))
+local function paintNumberGrid(value)
+	value = math.max(0, math.min(999, math.floor(value)))
 	for row = 0, GRID_ROWS - 1 do
 		for col = 0, GRID_COLS - 1 do
 			ledOff(10 * (8 - row) + col + 1)
@@ -494,14 +496,14 @@ local function paintTempoGrid()
 	-- of the width and show more detail.
 	local text
 	local widths = {}
-	if bpm >= 100 then
-		text = string.format("%3d", bpm)
+	if value >= 100 then
+		text = string.format("%3d", value)
 		widths[1] = (text:sub(1, 1) == "1") and 1 or 2
 		local remaining = GRID_COLS - widths[1]
 		widths[2] = math.floor(remaining / 2)
 		widths[3] = remaining - widths[2]
 	else
-		text = string.format("%2d", bpm)
+		text = string.format("%2d", value)
 		widths[1] = 4
 		widths[2] = 4
 	end
@@ -514,6 +516,18 @@ local function paintTempoGrid()
 		drawDigit(text:sub(i, i), x0, 0, widths[i], GRID_ROWS, colours[#text - i + 1])
 		x0 = x0 + widths[i]
 	end
+end
+
+local function paintTempoGrid()
+	local bpm = math.floor(call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
+	paintNumberGrid(bpm)
+end
+
+local function paintSwingGrid()
+	local q = mpc.sequencer and mpc.sequencer.quantiser
+	-- MPC swing: 50% = straight, 75% = max; clamp the display into the range
+	local swing = math.floor(call(q and q.GetSwing) or 50)
+	paintNumberGrid(math.max(50, math.min(75, swing)))
 end
 
 local function paintAdjustGrid()
@@ -563,6 +577,10 @@ end
 local function paintGrid()
 	if tempoMode then
 		paintTempoGrid()
+		return
+	end
+	if swingMode then
+		paintSwingGrid()
 		return
 	end
 	if adjustMode then
@@ -625,7 +643,12 @@ local function paintTrack()
 		return mpc.tracks ~= nil
 	end
 	local function fnColour(fn)
-		if heldFunction == fn or adjustMode == fn or (fn == "device" and tempoMode) then
+		if
+			heldFunction == fn
+			or adjustMode == fn
+			or (fn == "device" and tempoMode)
+			or (fn == "stopClip" and swingMode)
+		then
 			return C.white
 		elseif fnAvailable(fn) then
 			return C.available
@@ -726,9 +749,15 @@ local function paintLeft()
 	)
 	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
 	ledOff(LEFT.fixedLength)
-	ledOff(LEFT.quantize)
-	local nudgeOn = adjustMode ~= nil or tempoMode
-	local pageColour = tempoMode and C.white or adjustColour()
+	local quantizeAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.quantizeApply ~= nil
+	ledRGB(
+		LEFT.quantize,
+		quantizeAvailable and C.white[1] or C.off[1],
+		quantizeAvailable and C.white[2] or C.off[2],
+		quantizeAvailable and C.white[3] or C.off[3]
+	)
+	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode
+	local pageColour = tempoMode and C.white or (swingMode and C.yellow or adjustColour())
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -996,6 +1025,30 @@ local function changeTempo(delta)
 	flushLEDs()
 end
 
+local function changeSwing(delta)
+	local q = mpc.sequencer and mpc.sequencer.quantiser
+	-- MPC swing: 50% = straight, > 50 delays every other step; 75% is the max
+	local swing = call(q and q.GetSwing) or 50
+	swing = math.max(50, math.min(75, math.floor(swing + delta + 0.5)))
+	call(q and q.SetSwing, swing)
+	log("swing: " .. swing .. "%")
+	paintGrid()
+	paintLeft()
+	flushLEDs()
+end
+
+local function doQuantize()
+	local cs = mpc.controlSurface
+	local qa = cs and cs.quantizeApply
+	if qa and type(qa.Press) == "function" then
+		call(qa.Press)
+		call(qa.Release)
+		log("quantize applied")
+	else
+		logOnce("quantize", "quantize unavailable: controlSurface.quantizeApply missing")
+	end
+end
+
 local function nudgeAdjust(delta)
 	if not adjustMode then
 		return
@@ -1027,6 +1080,7 @@ end
 
 local function enterAdjust(newMode)
 	tempoMode = false
+	swingMode = false
 	adjustMode = newMode
 	adjustCol = 0
 	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
@@ -1151,6 +1205,7 @@ local function doShiftFunction(fn)
 		doTapTempo()
 	elseif fn == "device" then
 		adjustMode = nil
+		swingMode = false
 		tempoMode = not tempoMode
 		tempoHold = nil
 		if tempoMode then
@@ -1161,7 +1216,22 @@ local function doShiftFunction(fn)
 		paintAll()
 		flushLEDs()
 	elseif fn == "stopClip" then
-		log("swing: TODO")
+		adjustMode = nil
+		tempoMode = false
+		tempoHold = nil
+		swingMode = not swingMode
+		swingHold = nil
+		if swingMode then
+			log(
+				"swing page: "
+					.. tostring(call(mpc.sequencer and mpc.sequencer.quantiser and mpc.sequencer.quantiser.GetSwing))
+					.. "%"
+			)
+		else
+			log("swing page off")
+		end
+		paintAll()
+		flushLEDs()
 	else
 		log(fn .. " shift: TODO")
 	end
@@ -1259,7 +1329,7 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 				end
 			elseif adjustMode then
 				handleAdjustPad(col, row)
-			elseif not tempoMode then
+			elseif not tempoMode and not swingMode then
 				doClip(col, row)
 			end
 		end
@@ -1295,6 +1365,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		-- releasing the tempo up/down button stops the auto-repeat
 		if cc == LEFT.up or cc == LEFT.down then
 			tempoHold = nil
+			swingHold = nil
 		end
 		local fn = TRACK_FN[cc]
 		-- only the button that is actually held clears the hold; releasing a
@@ -1355,6 +1426,12 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		changeTempo(cc == LEFT.up and 1 or -1)
 		return
 	end
+	if swingMode and (cc == LEFT.up or cc == LEFT.down) then
+		swingHold = cc
+		swingHoldTicks = 0
+		changeSwing(cc == LEFT.up and 1 or -1)
+		return
+	end
 	if adjustMode and (cc == LEFT.up or cc == LEFT.down) then
 		nudgeAdjust(cc == LEFT.up and 1 / 8 or -1 / 8)
 		return
@@ -1376,7 +1453,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == LEFT.quantize then
-		log("quantize: TODO (no clip-quantize API in the 3.10.1 contract)")
+		doQuantize()
 		return
 	end
 	if cc == LEFT.duplicate then
@@ -1478,6 +1555,14 @@ function LaunchpadProMK3.HandleTimer()
 			changeTempo(tempoHold == LEFT.up and 1 or -1)
 		end
 	end
+	-- swing page: holding up/down repeats, accelerating after a short delay
+	if swingMode and swingHold then
+		swingHoldTicks = swingHoldTicks + 1
+		local interval = swingHoldTicks < 10 and 6 or (swingHoldTicks < 20 and 3 or 1)
+		if swingHoldTicks % interval == 0 then
+			changeSwing(swingHold == LEFT.up and 1 or -1)
+		end
+	end
 	if layoutQuerySent and not programmerEntered and ticks >= 1 then
 		sendLayout(0x11, 0)
 		programmerEntered = true
@@ -1514,6 +1599,7 @@ function LaunchpadProMK3.OnLoad()
 	adjustMode = nil
 	adjustSend = 1
 	tempoMode = false
+	swingMode = false
 	clipOp = nil
 	clipOrigin = nil
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
@@ -1609,6 +1695,7 @@ function LaunchpadProMK3.OnUnload()
 	adjustMode = nil
 	adjustSend = 1
 	tempoMode = false
+	swingMode = false
 	clipOp = nil
 	clipOrigin = nil
 	if programmerEntered then

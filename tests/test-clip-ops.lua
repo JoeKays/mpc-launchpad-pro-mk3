@@ -116,7 +116,7 @@ local function logged(needle)
 end
 assert(logged("DeleteClip(0,7)"), "clear logs DeleteClip")
 assert(logged("CopyClip(0,7 -> 1,7)"), "duplicate logs CopyClip")
-assert(logged("quantize: TODO"), "quantize TODO")
+assert(logged("quantize applied"), "quantize applied")
 assert_eq(mock.count("DeleteClip"), 0, "degrade: no DeleteClip")
 assert_eq(mock.count("CopyClip"), 0, "degrade: no CopyClip")
 

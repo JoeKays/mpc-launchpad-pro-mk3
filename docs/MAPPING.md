@@ -32,7 +32,7 @@ and press it again to exit.
 | 5 | pan menu | — |
 | 6 | sends menu | tap again to cycle send 1-4 |
 | 7 | tempo page (Shift) | tempo page: up/down change BPM, hold to accelerate |
-| 8 | stop clip | swing (stub) |
+| 8 | stop clip | swing page: up/down change swing, hold to accelerate |
 
 Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or hold CC 8
 and press a clip pad to stop the clips on that pad's track. The clip pad does not launch
@@ -59,7 +59,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 5 | — | — |
 | 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
 | 7 | tempo page (Shift) | toggles the tempo page; the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones white, tens orange, hundreds blue; blue/orange/white differ in hue and luminance for colourblind accessibility); up/down change BPM (hold accelerates) |
-| 8 | swing (stub) | logs `swing: TODO` |
+| 8 | swing page (Shift) | toggles the swing page; the grid draws the swing % left-aligned as scaled 7-segment digits (same layout and colourblind-safe colours as the tempo page); up/down change swing by 1 (50-75, hold accelerates) |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
 leaves the surface working.
@@ -93,6 +93,25 @@ curve `dB = 40*log10(gain) + 6` (so 0 dB = gain 0.708, +6 dB = gain 1.0, -inf = 
 Pan writes `.Pan.value` (0..1, 0.5 = centre). Sends write `.Send1`..`.Send4.value` (0..1).
 The faders are cyan (volume), magenta (pan) and one colour per send
 (yellow/green/blue/orange); the active function button is white.
+
+### Swing page (Shift + CC 8)
+
+Shift + CC 8 toggles the swing page. The grid draws the swing percentage (50-75) with the
+same left-aligned 7-segment renderer and colourblind-safe colours as the tempo page. MPC
+swing is percent-based: 50% is straight timing (no swing), 66% is a perfect triplet feel
+and 75% is the maximum. Up
+(CC 80) and down (CC 70) change swing by 1; holding accelerates (300 ms, then 150 ms,
+then 50 ms). The pads are inert on this page. The swing value is read/written through
+`mpc.sequencer.quantiser.GetSwing()` / `SetSwing(50-75)`; the stop-clip button (CC 8) is
+white while the page is open and the up/down arrows take the swing page colour (yellow).
+
+### Quantize (CC 40)
+
+CC 40 applies quantize to the selected clip/notes by pressing the MPC's own quantize
+button: `mpc.controlSurface.quantizeApply.Press()` then `Release()`. The quantize button
+is white when `controlSurface.quantizeApply` exists and off otherwise. The quantize
+settings themselves live on `mpc.sequencer.quantiser` (`SetEnabled`, `SetStrength`,
+`SetTimeDivision`, `SetWindow`, `SetShift`, `SetSwing`).
 
 ## Right column (CC 19-89 + 99)
 
@@ -131,7 +150,7 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 10 | record/capture midi | `sequencer.Record` |
 | 20 | play | `IsPlaying` ? `Stop` : `Play` |
 | 30 | fixed length | stub |
-| 40 | quantize/record quantize | stub (no clip-quantize API in the 3.10.1 contract) |
+| 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()` |
 | 50 | duplicate/double | hold duplicate, press the origin clip pad, then one or more target clip pads (`clipMatrix.CopyClip`) |
 | 60 | clear | hold clear, press one or more clip pads (`clipMatrix.DeleteClip`) |
 | 70 | down | window down (`MoveDown`); Shift = 8 |
@@ -155,7 +174,7 @@ working.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
 - Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected.
 - Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording; duplicate/clear white while available; up/down white while available and take the page colour while a fader menu is open (cyan volume, magenta pan, send colour). Fixed length and quantize are stubs and stay off.
+- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page or swing page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing). Fixed length is a stub and stays off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),

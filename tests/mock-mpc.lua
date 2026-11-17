@@ -88,6 +88,7 @@ end
 
 -- sequencer
 local mockBpm = 120
+local mockSwing = 50
 local sequencer = {
 	Play = function()
 		record("Play")
@@ -118,6 +119,45 @@ local sequencer = {
 	GetBPM = function()
 		return mockBpm
 	end,
+	quantiser = {
+		GetSwing = function()
+			return mockSwing
+		end,
+		SetSwing = function(v)
+			record("SetSwing", v)
+			mockSwing = v
+		end,
+		GetEnabled = function()
+			return true
+		end,
+		SetEnabled = function(v)
+			record("SetEnabled", v)
+		end,
+		GetStrength = function()
+			return 100
+		end,
+		SetStrength = function(v)
+			record("SetStrength", v)
+		end,
+		GetTimeDivision = function()
+			return "1/16"
+		end,
+		SetTimeDivision = function(v)
+			record("SetTimeDivision", v)
+		end,
+		GetWindow = function()
+			return 100
+		end,
+		SetWindow = function(v)
+			record("SetWindow", v)
+		end,
+		GetShift = function()
+			return 0
+		end,
+		SetShift = function(v)
+			record("SetShift", v)
+		end,
+	},
 }
 
 -- command manager
@@ -307,7 +347,17 @@ local mpc = {
 	sequencer = sequencer,
 	commandManager = commandManager,
 	force = force,
-	controlSurface = { pads = { Tap = function() end, Press = function() end, Release = function() end } },
+	controlSurface = {
+		pads = { Tap = function() end, Press = function() end, Release = function() end },
+		quantizeApply = {
+			Press = function()
+				record("quantizeApply.Press")
+			end,
+			Release = function()
+				record("quantizeApply.Release")
+			end,
+		},
+	},
 	ui = {
 		ShowTUIFeedback = function(s)
 			record("ShowTUIFeedback", s)

@@ -89,6 +89,23 @@ journalctl -u acvs -o cat --no-pager | grep LaunchpadProMK3
 2. Press 10. Expect `Record` and MPC records; the record button lights red.
 3. Press 20 again. Expect `Stop` and MPC stops (the script checks `IsPlaying`).
 
+## 6b. Tempo / tap tempo / swing / quantize
+
+1. Shift + CC 7. Expect `tempo page: <bpm> BPM` and the BPM digits on the grid.
+2. Press CC 80/70. Expect the BPM to change by 1 and MPC's tempo to follow.
+3. Shift + CC 7 again. Expect `tempo page off`.
+4. Shift + CC 6 twice (500 ms apart). Expect `tap tempo: <bpm> BPM (...)` and the MPC
+   tempo field updates to the rounded value.
+5. Shift + CC 8. Expect `swing page: 50%` (or the current TC swing) and the swing digits
+   on the grid; compare with the MPC's Timing Correct window (Main Mode, TC field):
+   both must show the same number.
+6. Press CC 80. Expect `swing: 51%` and the MPC TC Swing field shows 51%. Press CC 70
+   to return to 50%. Values are clamped to 50-75; confirm the TC field never leaves
+   that range.
+7. Shift + CC 8 again. Expect `swing page off`.
+8. Record some loose notes on a clip, then press CC 40 (quantize). Expect
+   `quantize applied` and the notes snap per the current TC settings.
+
 ## 7. Teardown
 
 1. Remove the script folder and restart MPC.
@@ -125,5 +142,10 @@ LaunchpadProMK3: Stop
 LaunchpadProMK3: Record
 LaunchpadProMK3: Undo
 LaunchpadProMK3: Redo
+LaunchpadProMK3: swing page: 50%
+LaunchpadProMK3: swing: 51%
+LaunchpadProMK3: swing: 50%
+LaunchpadProMK3: swing page off
+LaunchpadProMK3: quantize applied
 LaunchpadProMK3: unloaded
 ```

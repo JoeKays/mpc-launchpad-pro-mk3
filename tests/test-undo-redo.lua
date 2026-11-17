@@ -115,8 +115,19 @@ L.HandleMIDICC(0, 7, 127) -- exit tempo page
 assert_eq(lastLog(), "LaunchpadProMK3: tempo page off", "tempo page off")
 L.HandleMIDICC(0, 7, 0)
 L.HandleMIDICC(0, 8, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: swing: TODO", "swing stub")
+assert_eq(lastLog(), "LaunchpadProMK3: swing page: 50%", "swing page opens")
+L.HandleMIDICC(0, 80, 127) -- up
+assert_eq(lastLog(), "LaunchpadProMK3: swing: 51%", "swing up")
+L.HandleMIDICC(0, 80, 0)
+L.HandleMIDICC(0, 70, 127) -- down
+assert_eq(lastLog(), "LaunchpadProMK3: swing: 50%", "swing down")
+L.HandleMIDICC(0, 70, 0)
+L.HandleMIDICC(0, 8, 127) -- exit swing page
+assert_eq(lastLog(), "LaunchpadProMK3: swing page off", "swing page off")
 L.HandleMIDICC(0, 8, 0)
+L.HandleMIDICC(0, 40, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "quantize applied")
+L.HandleMIDICC(0, 40, 0)
 L.HandleMIDICC(0, 90, 0)
 
 -- Degrade: a missing commandManager/sequencer leaves the shift functions inert,
