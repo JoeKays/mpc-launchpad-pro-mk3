@@ -376,6 +376,12 @@ local mappings = {
 		RemoveNoteToMpcPad = function(ch, note, pad)
 			record("RemoveNoteToMpcPad", ch, note, pad)
 		end,
+		AddNoteToVirtualPad = function(ch, note, vpad)
+			record("AddNoteToVirtualPad", ch, note, vpad)
+		end,
+		RemoveNoteToVirtualPad = function(ch, note)
+			record("RemoveNoteToVirtualPad", ch, note)
+		end,
 	},
 	tracks = {
 		mutes = {

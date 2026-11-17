@@ -158,6 +158,10 @@ local followMode = false -- optional grid-follows-current-track; Shift+CC 93 tog
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local padUtility = "off" -- CC 95 cycles the MPC's pad utilities: note repeat -> full level -> off
+local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or chromatic (virtual pads)
+local padsBaseNote = 48 -- chromatic layout root note (up/down arrows shift it by an octave)
+local boundPadNotes = {} -- grid notes currently routed away from the script
+local chromaticVirtualPad -- forward declaration (defined with the pad-mode helpers)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
@@ -284,14 +288,6 @@ end
 
 -- Pad mode availability: the mode button lights only when its mappings exist;
 -- otherwise it stays off and the surface keeps today's behaviour.
-local function padsModeAvailable()
-	local m = dev.mappings
-	return m ~= nil
-		and m.script ~= nil
-		and m.pads ~= nil
-		and mpc.controlSurface ~= nil
-		and mpc.controlSurface.pads ~= nil
-end
 
 local function argb(c)
 	c = tonumber(c) or 0
@@ -942,7 +938,23 @@ end
 -- Pads mode grid: the bottom-left 4x4 quadrant mirrors mpc.controlSurface.pads[i].Colour
 -- (ARGB int, alpha ignored); the rest of the grid is dark. poll=true re-reads the pad
 -- colours; padsColourCache keeps the last ARGB per pad so only diffs are sent.
+-- Chromatic layout LEDs: a plain dim note grid with C notes brighter so the octave
+-- shape is visible (no MPC pad colours exist for virtual pads).
+local function paintChromaticGrid()
+	for padRow = 0, 7 do
+		for col = 0, 7 do
+			local idx = 10 * (padRow + 1) + col + 1
+			local v = (chromaticVirtualPad(padRow, col) % 12 == 0) and 30 or 12
+			ledRGB(idx, v, v, v)
+		end
+	end
+end
+
 local function paintPadsGrid(poll)
+	if padsLayout == "chromatic" then
+		paintChromaticGrid()
+		return
+	end
 	local quadrant = {}
 	for i = 0, 15 do
 		quadrant[10 * (math.floor(i / 4) + 1) + (i % 4) + 1] = true
@@ -1123,6 +1135,7 @@ local function paintTrack()
 end
 
 local padUtilityAvailable -- forward declaration (defined with the pad-mode helpers)
+local padsLayoutAvailable -- forward declaration (defined with the pad-mode helpers)
 
 local function paintTop()
 	local function modeColour(m)
@@ -1135,7 +1148,12 @@ local function paintTop()
 	-- session shows cyan while grid-follow is enabled so the toggle state is visible
 	local session = followMode and C.cyan or modeColour("clip")
 	local sequencer = modeColour("step")
-	local note = padsMode and C.white or (padsModeAvailable() and C.available or C.off)
+	local note = C.off
+	if padsMode then
+		note = (padsLayout == "chromatic") and C.cyan or C.white
+	elseif padsLayoutAvailable() then
+		note = C.available
+	end
 	local chord = C.off
 	if padsMode and padUtility ~= "off" then
 		chord = C.white
@@ -1432,6 +1450,17 @@ padUtilityAvailable = function()
 	return true
 end
 
+padsLayoutAvailable = function()
+	local pads = dev.mappings and dev.mappings.pads
+	if not pads then
+		return false
+	end
+	if padsLayout == "chromatic" then
+		return type(pads.AddNoteToVirtualPad) == "function"
+	end
+	return type(pads.AddNoteToMpcPad) == "function"
+end
+
 local function clearPadUtility()
 	if padUtility ~= "off" then
 		pressSurfaceButton(PAD_UTILITY_BUTTONS[padUtility])
@@ -1472,32 +1501,65 @@ local function exitPadsMode()
 	clearPadUtility()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
-	for i = 0, 15 do
-		local note = padsModeNote(i)
-		call(pads and pads.RemoveNoteToMpcPad, 0, note, i)
-		call(m and m.AddNoteToScript, 0, note)
+	for _, b in ipairs(boundPadNotes) do
+		if b.pad then
+			call(pads and pads.RemoveNoteToMpcPad, 0, b.note, b.pad)
+		else
+			call(pads and pads.RemoveNoteToVirtualPad, 0, b.note)
+		end
+		call(m and m.AddNoteToScript, 0, b.note)
 	end
+	boundPadNotes = {}
 	padsColourCache = {}
 	log("pads mode off")
 end
 
 -- Enter pads mode: route the 16 quadrant notes to the MPC pads (hardware-routed; they no
 -- longer reach HandleMIDINoteOn). Missing mappings degrade: the mode stays off.
+-- Chromatic layout: the whole grid, rows a perfect 4th apart (5 semitones), driven
+-- through virtual pads (AddNoteToVirtualPad) because AddNoteToMpcPad only reaches
+-- bank A (16 pads, device-verified). The root note shifts by octaves with the
+-- up/down arrows while the mode is open.
+chromaticVirtualPad = function(padRow, col)
+	return padsBaseNote + padRow * 5 + col
+end
+
 local function enterPadsMode()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
-	if not (m and pads and m.RemoveNoteToScript and pads.AddNoteToMpcPad) then
+	if not (m and pads and m.RemoveNoteToScript) then
 		logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
+		return
+	end
+	if padsLayout == "chromatic" and type(pads.AddNoteToVirtualPad) ~= "function" then
+		logOnce("padschromatic", "chromatic layout unavailable: AddNoteToVirtualPad missing")
+		return
+	end
+	if padsLayout == "drum" and type(pads.AddNoteToMpcPad) ~= "function" then
+		logOnce("padsmode", "pads mode unavailable: AddNoteToMpcPad missing")
 		return
 	end
 	padsMode = true
 	padsColourCache = {}
-	for i = 0, 15 do
-		local note = padsModeNote(i)
-		call(m.RemoveNoteToScript, 0, note)
-		call(pads.AddNoteToMpcPad, 0, note, i)
+	boundPadNotes = {}
+	if padsLayout == "chromatic" then
+		for padRow = 0, 7 do
+			for col = 0, 7 do
+				local note = 10 * (padRow + 1) + col + 1
+				call(m.RemoveNoteToScript, 0, note)
+				call(pads.AddNoteToVirtualPad, 0, note, chromaticVirtualPad(padRow, col))
+				boundPadNotes[#boundPadNotes + 1] = { note = note }
+			end
+		end
+	else
+		for i = 0, 15 do
+			local note = padsModeNote(i)
+			call(m.RemoveNoteToScript, 0, note)
+			call(pads.AddNoteToMpcPad, 0, note, i)
+			boundPadNotes[#boundPadNotes + 1] = { note = note, pad = i }
+		end
 	end
-	log("pads mode on")
+	log("pads mode on (" .. padsLayout .. ", base " .. (padsLayout == "chromatic" and padsBaseNote or "drum") .. ")")
 end
 
 local function togglePadsMode()
@@ -2176,6 +2238,23 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		paintAll()
 		return
 	end
+	if padsMode and (cc == TOP.left or cc == TOP.right) then
+		-- inside pads mode the window scroll is unused: < > switch the layout instead
+		padsLayout = (padsLayout == "drum") and "chromatic" or "drum"
+		exitPadsMode()
+		enterPadsMode()
+		paintAll()
+		return
+	end
+	if padsMode and padsLayout == "chromatic" and (cc == LEFT.up or cc == LEFT.down) then
+		local delta = (cc == LEFT.up) and 12 or -12
+		padsBaseNote = math.max(24, math.min(96, padsBaseNote + delta))
+		exitPadsMode()
+		enterPadsMode()
+		paintAll()
+		log("chromatic base " .. padsBaseNote)
+		return
+	end
 	if cc == TOP.custom then
 		logOnce("custom", "custom mode: TODO (mutes live on the CC 2 hold-function)")
 		return
@@ -2453,6 +2532,8 @@ function LaunchpadProMK3.OnLoad()
 	qlinkCol = 0
 	followMode = false
 	padsMode = false
+	padsLayout = "drum"
+	padsBaseNote = 48
 	padUtility = "off"
 	padsColourCache = {}
 	clipOp = nil

@@ -163,4 +163,36 @@ mock.reset()
 L.HandleMIDICC(0, 95, 127)
 assert_eq(mock.count("noteRepeat.Press"), 0, "no pad utility outside pads mode")
 
+-- Chromatic layout: < > switches layouts inside pads mode; the whole grid maps to
+-- virtual pads in 4ths; up/down shifts the base note by an octave.
+mock.reset()
+L.HandleMIDICC(0, 94, 127) -- enter pads mode (drum)
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout on enter")
+L.HandleMIDICC(0, 92, 127) -- > switches to chromatic
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "drum unbound on switch")
+assert_eq(mock.count("AddNoteToVirtualPad"), 64, "64 virtual pads bound")
+local first = mock.find("AddNoteToVirtualPad")[1]
+assert_eq(first.args[3], 48, "bottom-left virtual pad = base 48")
+assert_eq(mock.find("AddNoteToVirtualPad")[9].args[3], 53, "row above starts a 4th higher")
+assert_eq(mock.leds[94][2], 127, "note button cyan in chromatic layout")
+assert_eq(mock.leds[94][1], 0, "note button cyan r")
+assert_eq(mock.leds[11][2], 30, "C note brighter in the grid")
+-- octave up: rebinds one octave higher (the latest 64 bindings)
+local function latestVirtual()
+	local all = mock.find("AddNoteToVirtualPad")
+	return all[#all - 63]
+end
+L.HandleMIDICC(0, 80, 127)
+assert_eq(latestVirtual().args[3], 60, "base shifted +12")
+L.HandleMIDICC(0, 70, 127)
+assert_eq(latestVirtual().args[3], 48, "base shifted back")
+-- < returns to drum layout
+L.HandleMIDICC(0, 91, 127)
+assert_eq(mock.count("AddNoteToMpcPad"), 32, "drum re-entered (16 + 16)")
+-- exit restores everything
+mock.reset()
+L.HandleMIDICC(0, 94, 127)
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "exit unbinds drum pads")
+assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the notes")
+
 print("test-pad-modes: PASS")

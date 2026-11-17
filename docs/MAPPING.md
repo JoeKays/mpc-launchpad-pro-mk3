@@ -201,9 +201,22 @@ of the grid is dark and inert. Press the mode button again, press CC 93 (session
 another mode or page, or unload to exit: the 16 notes return to the script and the
 normal clip grid is repainted.
 
-Pad 0-15 maps to the bottom-left 4x4 quadrant (`col = pad % 4`, `padRow = pad // 4`,
-`note = 10*(padRow+1)+col+1`, so pad 0 = note 11). Each note is unbound from the script
-and bound with `mappings.pads.AddNoteToMpcPad`, so the pads play the MPC's own pad bank.
+Two layouts, switched with `<` / `>` (CC 91/92) while the mode is open:
+
+- **drum** (default): pad 0-15 maps to the bottom-left 4x4 quadrant (`col = pad % 4`,
+  `padRow = pad // 4`, `note = 10*(padRow+1)+col+1`, so pad 0 = note 11). Each note is
+  unbound from the script and bound with `mappings.pads.AddNoteToMpcPad` (bank A only,
+  device-verified), so the pads play the MPC's own pad bank; the quadrant mirrors the
+  MPC pad colours.
+- **chromatic**: the whole 8x8 grid plays chromatic notes in perfect 4ths (each row
+  +5 semitones) through `mappings.pads.AddNoteToVirtualPad` — virtual pads are the
+  MPC's note-addressed pad input. The base note (default 48) shifts an octave with
+  up/down (CC 80/70) while the mode is open. LEDs: dim note grid, C notes brighter.
+  The note button shows cyan in this layout (white in drum).
+
+Press the mode button again, press CC 93 (session), enter another mode or page, or
+unload to exit: the bound notes return to the script and the normal clip grid is
+repainted.
 The quadrant LEDs mirror `mpc.controlSurface.pads[i]` colour — read via `GetColour()`
 with the `Colour.value` property as fallback (ARGB int, alpha ignored, scaled to
 0-127) — polled from the script timer every 100 ms; only changed colours are sent.
