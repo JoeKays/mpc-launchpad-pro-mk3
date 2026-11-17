@@ -751,21 +751,45 @@ end
 -- page lives at 0,4,8,12 and the Beat Repeat page at 1,5,9,13, each reading newest
 -- slot first on the screen). Page 1 of the Launchpad grid shows
 -- the first 8 assigned Q-Links in this order, page 2 the rest.
-local QLINK_DISPLAY_ORDER = { 12, 8, 4, 0, 13, 9, 5, 1, 14, 10, 6, 2, 15, 11, 7, 3 }
+local QLINK_PAGE_GROUPS = {
+	[0] = { { 12, 8, 4, 0 }, { 13, 9, 5, 1 } }, -- MPC pages 1+2
+	[1] = { { 14, 10, 6, 2 }, { 15, 11, 7, 3 } }, -- MPC pages 3+4
+}
 local qlinkColumnMap = {}
 
-local function buildQlinkColumnMap()
+-- Fixed bank groups: columns 1-4 always belong to the MPC's page 1 (12,8,4,0), columns
+-- 5-8 to its page 2 (13,9,5,1) — an unassigned slot only ever leaves a gap at the END
+-- of its group, so faders never slide across a bank boundary and the grouping on the
+-- grid matches the MPC screen exactly.
+local function buildQlinkColumnMap(page)
 	qlinkColumnMap = {}
 	local count = qlinkCount()
-	for _, i in ipairs(QLINK_DISPLAY_ORDER) do
-		if i < count and qlinkAssigned(i) then
-			qlinkColumnMap[#qlinkColumnMap + 1] = i
+	local groups = QLINK_PAGE_GROUPS[page or qlinkPage] or QLINK_PAGE_GROUPS[0]
+	for g = 1, 2 do
+		local col = 4 * (g - 1)
+		for _, i in ipairs(groups[g]) do
+			if i < count and qlinkAssigned(i) then
+				qlinkColumnMap[col] = i
+				col = col + 1
+			end
 		end
 	end
 end
 
 local function qlinkForColumn(col)
-	return qlinkColumnMap[qlinkPage * GRID_COLS + col + 1]
+	return qlinkColumnMap[col]
+end
+
+local function qlinkPageHasContent(page)
+	local count = qlinkCount()
+	for _, group in ipairs(QLINK_PAGE_GROUPS[page]) do
+		for _, i in ipairs(group) do
+			if i < count and qlinkAssigned(i) then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function paintQlinkGrid()
@@ -847,14 +871,19 @@ local function enterQlink()
 	qlinkFlip = {}
 	qlinkSeenStrings = {}
 	qlinkSeenPos = {}
-	buildQlinkColumnMap()
+	buildQlinkColumnMap(0)
 	local map = {}
-	for c, i in ipairs(qlinkColumnMap) do
-		if c <= GRID_COLS then
-			map[#map + 1] = c .. "=" .. qlinkTargetName(i)
+	local assignedCount = 0
+	for c = 0, GRID_COLS - 1 do
+		local i = qlinkColumnMap[c]
+		if i then
+			assignedCount = assignedCount + 1
+			map[#map + 1] = (c + 1) .. "=" .. qlinkTargetName(i)
+		else
+			map[#map + 1] = (c + 1) .. "=-"
 		end
 	end
-	log("qlink page (" .. #qlinkColumnMap .. " assigned): " .. table.concat(map, ", "))
+	log("qlink page (" .. assignedCount .. " assigned): " .. table.concat(map, ", "))
 	paintAll()
 end
 local function exitQlink()
@@ -2110,10 +2139,9 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if qlinkMode and (cc == LEFT.up or cc == LEFT.down) then
-		buildQlinkColumnMap()
 		if shift then
 			nudgeQlink(cc == LEFT.up and 1 or -1)
-		elseif qlinkPage == 0 and #qlinkColumnMap > GRID_COLS then
+		elseif qlinkPage == 0 and qlinkPageHasContent(1) then
 			qlinkPage = 1
 			log("qlink page 2")
 			paintAll()
@@ -2196,8 +2224,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			end
 		elseif fn == "device" then
 			if qlinkMode then
-				buildQlinkColumnMap()
-				if qlinkPage == 0 and #qlinkColumnMap > GRID_COLS then
+				if qlinkPage == 0 and qlinkPageHasContent(1) then
 					qlinkPage = 1
 					log("qlink page 2")
 					paintAll()

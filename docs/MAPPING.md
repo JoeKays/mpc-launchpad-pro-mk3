@@ -162,9 +162,12 @@ GetPosition())` with the delta clamped to ±127, repeated at most twice to absor
 string)`. If a qlink object has no `Twist`, the script falls back to `SetPosition(target)`
 and logs `qlink N = pos (setpos)` — `SetPosition` alone updates the Q-Link's ValueString
 but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMITATIONS).
-All 16 Q-Links are reachable, **compacted**: only the assigned Q-Links (non-empty
-target name) get columns, packed left-to-right with no dark gaps between faders; the
-page-open log line lists the map (`qlink page (N assigned): 1=name, 2=name, ...`).
+All 16 Q-Links are reachable. Columns keep **fixed bank groups**: columns 1-4 are
+always the MPC's Q-Link page 1 (12,8,4,0), columns 5-8 its page 2 (13,9,5,1) —
+Launchpad page 2 shows pages 3+4 the same way. Assigned Q-Links compact *within*
+their group only, so a missing slot leaves its gap at the end of its own group and
+faders never slide across a bank boundary. The page-open log lists the map with `-`
+for gaps (`qlink page (N assigned): 1=name, 2=-, ...`).
 The column order follows the MPC's Q-Link screen, which lists the 16 slots
 **column-major with each bank reversed** (its page 1 = Q-Links 12,8,4,0; page 2 =
 13,9,5,1; page 3 = 14,10,6,2; page 4 = 15,11,7,3) — raw index order would interleave

@@ -139,27 +139,36 @@ mock.qlinks[0].SetPosition(127)
 mock.qlinks[3].SetPosition(127)
 mock.qlinks[5].SetPosition(127)
 L.HandleMIDICC(0, 7, 127) -- enter: page 1 (paints the current positions)
--- column-major order of {0,3,5,9} is 0, 5, 9, 3
+-- {0,3,5,9}: group 1 (cols 1-4) holds qlink 0 only; group 2 (cols 5-8) holds 9, 5
+-- (compacted within the group); qlink 3 lives on page 2.
 assert_eq(
 	lastLog(),
-	"LaunchpadProMK3: qlink page (4 assigned): 1=Kill EQ Low, 2=Beat Repeat Delay, 3=Kill EQ Mid, 4=Beat Repeat",
-	"page-open map log (column-major, reversed within bank)"
+	"LaunchpadProMK3: qlink page (3 assigned): 1=Kill EQ Low, 2=-, 3=-, 4=-, 5=Beat Repeat Delay, 6=Kill EQ Mid, 7=-, 8=-",
+	"page-open map log (fixed bank groups, gaps only at group ends)"
 )
--- order of {0,3,5,9}: 0, 9, 5, 3
 assert_eq(mock.leds[11][2], 127, "column 1 = qlink 0 cyan")
-assert_eq(mock.leds[12][1], 12, "column 2 = qlink 9 dim at position 0")
-assert_eq(mock.leds[13][1], 127, "column 3 = qlink 5 magenta r")
-assert_eq(mock.leds[13][2], 0, "column 3 = qlink 5 magenta g")
-assert_eq(mock.leds[14][2], 127, "column 4 = qlink 3 cyan g")
-assert_eq(mock.leds[15] and mock.leds[15][2] or 0, 0, "column 5 dark (only 4 assigned)")
-assert_eq(mock.leds[18] and mock.leds[18][2] or 0, 0, "column 8 dark")
-L.HandleMIDINoteOn(0, 82, 100) -- column 2 top pad drives qlink 9 to 127
-assert_eq(mock.qlinks[9]:GetPosition(), 127, "compacted column 2 drives qlink 9")
-L.HandleMIDINoteOn(0, 13, 100) -- column 3 bottom pad drives qlink 5 to 16
-assert_eq(mock.qlinks[5]:GetPosition(), 16, "compacted column 3 drives qlink 5")
-L.HandleMIDINoteOn(0, 18, 100) -- column 7 has no qlink: inert
-L.HandleMIDICC(0, 7, 127) -- <= 8 assigned: Device tap exits directly
-assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "device tap exits when page 2 would be empty")
+assert_eq(mock.leds[12] and mock.leds[12][2] or 0, 0, "column 2 dark (group 1 gap)")
+assert_eq(mock.leds[13] and mock.leds[13][2] or 0, 0, "column 3 dark (group 1 gap)")
+assert_eq(mock.leds[14] and mock.leds[14][2] or 0, 0, "column 4 dark (group 1 gap)")
+assert_eq(mock.leds[15][1], 12, "column 5 = qlink 9 dim at position 0")
+assert_eq(mock.leds[16][1], 127, "column 6 = qlink 5 magenta r")
+assert_eq(mock.leds[16][2], 0, "column 6 = qlink 5 magenta g")
+L.HandleMIDINoteOn(0, 85, 100) -- column 5 top pad drives qlink 9 to 127
+assert_eq(mock.qlinks[9]:GetPosition(), 127, "group-2 column 5 drives qlink 9")
+assert_eq(mock.leds[85][1], 127, "qlink 9 top pad yellow r after the drive")
+assert_eq(mock.leds[85][2], 127, "qlink 9 top pad yellow g after the drive")
+L.HandleMIDINoteOn(0, 16, 100) -- column 6 bottom pad drives qlink 5 to 16
+assert_eq(mock.qlinks[5]:GetPosition(), 16, "group-2 column 6 drives qlink 5")
+L.HandleMIDINoteOn(0, 12, 100) -- column 2 is a gap: inert
+assert_eq(mock.count("Twist"), mock.count("Twist"), "gap column inert")
+L.HandleMIDINoteOn(0, 18, 100) -- column 8 is a gap: inert
+-- page 2 holds qlink 3 (group {15,11,7,3}), so a Device tap goes there first
+L.HandleMIDICC(0, 7, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page 2", "device tap opens page 2 when it has content")
+L.HandleMIDINoteOn(0, 84, 100) -- page 2 column 1 = qlink 3 top pad
+assert_eq(mock.qlinks[3]:GetPosition(), 127, "page 2 group drives qlink 3")
+L.HandleMIDICC(0, 7, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "next tap exits")
 
 -- Device tap cycles pages when more than 8 are assigned.
 for i = 0, 15 do
