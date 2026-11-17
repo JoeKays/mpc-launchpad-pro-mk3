@@ -1592,10 +1592,24 @@ local function enterPadsMode()
 	log("pads mode on (" .. padsLayout .. ", base " .. (padsLayout == "chromatic" and padsBaseNote or "drum") .. ")")
 end
 
--- Tapping Note iterates: clip grid -> drum layout -> chromatic layout -> clip grid.
+-- Pick the first layout from the current track's Type: pad-based programs (Drum)
+-- get the drum layout, melodic programs (Plugin/Keygroup/MIDI) get chromatic.
+local function firstLayoutForTrack()
+	local t = mpc.tracks and mpc.tracks.currentTrack
+	local trackType = propValue(t, "Type")
+	if type(trackType) == "string" and trackType ~= "" and trackType ~= "Drum" then
+		return "chromatic", trackType
+	end
+	return "drum", trackType
+end
+
+-- Tapping Note iterates: clip grid -> layout (chosen from the track type) ->
+-- the other layout -> clip grid.
 local function togglePadsMode()
 	if not padsMode then
-		padsLayout = "drum"
+		local layout, trackType = firstLayoutForTrack()
+		padsLayout = layout
+		log("track type " .. tostring(trackType or "?") .. " -> " .. layout)
 		closeGridStates()
 		enterPadsMode()
 		if padsMode then
@@ -1603,8 +1617,9 @@ local function togglePadsMode()
 		end
 		return
 	end
-	if padsLayout == "drum" then
-		padsLayout = "chromatic"
+	-- in-mode taps: first switch to the other layout, the next tap exits
+	if padsLayout == firstLayoutForTrack() then
+		padsLayout = (padsLayout == "drum") and "chromatic" or "drum"
 		exitPadsMode()
 		enterPadsMode()
 		return

@@ -464,6 +464,7 @@ local mpc = {
 		normalTracks = tracks,
 		currentTrack = {
 			Index = prop(0),
+			Type = prop("Drum"),
 			Previous = function()
 				record("currentTrack.Previous")
 			end,

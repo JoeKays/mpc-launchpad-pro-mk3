@@ -194,4 +194,18 @@ assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
 assert_eq(mock.count("bank1.Press"), 1, "leaving chromatic resets the pad bank")
 assert_eq(mock.leds[94][1], 60, "note button available after exit")
 
+-- Track-type-aware first layout: a Plugin track opens straight into chromatic.
+mock.reset()
+mock.mpc.tracks.currentTrack.Type.value = "Plugin"
+L.HandleMIDICC(0, 94, 127)
+assert_eq(mock.count("AddNoteToVirtualPad"), 64, "plugin track starts in chromatic")
+assert_eq(mock.count("AddNoteToMpcPad"), 0, "no drum binding for a plugin track")
+mock.reset()
+L.HandleMIDICC(0, 94, 127) -- chromatic -> drum
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "second tap still iterates to drum")
+mock.reset()
+L.HandleMIDICC(0, 94, 127) -- drum -> off (drum notes restore)
+assert_eq(mock.count("AddNoteToScript"), 16, "third tap exits")
+mock.mpc.tracks.currentTrack.Type.value = "Drum"
+
 print("test-pad-modes: PASS")
