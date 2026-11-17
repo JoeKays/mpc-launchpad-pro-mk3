@@ -1534,8 +1534,13 @@ end
 -- through virtual pads (AddNoteToVirtualPad) because AddNoteToMpcPad only reaches
 -- bank A (16 pads, device-verified). The root note shifts by octaves with the
 -- up/down arrows while the mode is open.
+-- Virtual pad N sounds as MIDI note 36+N (pad 1 = note 36, the MPC pad-note map),
+-- so the pad index for a sounding note is note - 36; the base note is a real MIDI
+-- note (default 48 = C3). Device-verified: the old direct mapping sounded an octave
+-- and a half too high.
 chromaticVirtualPad = function(padRow, col)
-	return padsBaseNote + padRow * 5 + col
+	local note = padsBaseNote + padRow * 5 + col
+	return note - 36
 end
 
 local function enterPadsMode()

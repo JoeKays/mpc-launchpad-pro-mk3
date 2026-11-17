@@ -213,7 +213,8 @@ Tapping the Note button iterates: clip grid -> **drum** -> **chromatic** -> clip
   MPC pad colours.
 - **chromatic**: the whole 8x8 grid plays chromatic notes in perfect 4ths (each row
   +5 semitones) through `mappings.pads.AddNoteToVirtualPad` — virtual pads are the
-  MPC's note-addressed pad input. Leaving the chromatic layout presses the MPC's
+  MPC's note-addressed pad input; virtual pad N sounds as MIDI note 36+N, so the pad
+  index is the target note minus 36 (base 48 = C3). Leaving the chromatic layout presses the MPC's
   bank-1 button (`controlSurface.bank1`): virtual pads sit beyond the physical 16 and
   can otherwise leave the pad engine on an out-of-range bank where every track's pads
   are dark and silent (MIDI still registers). The base note (default 48) shifts an octave with

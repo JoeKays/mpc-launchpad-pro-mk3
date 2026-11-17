@@ -170,8 +170,8 @@ L.HandleMIDICC(0, 94, 127) -- second tap: chromatic
 assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "drum unbound on the second tap")
 assert_eq(mock.count("AddNoteToVirtualPad"), 64, "64 virtual pads bound")
 local first = mock.find("AddNoteToVirtualPad")[1]
-assert_eq(first.args[3], 48, "bottom-left virtual pad = base 48")
-assert_eq(mock.find("AddNoteToVirtualPad")[9].args[3], 53, "row above starts a 4th higher")
+assert_eq(first.args[3], 12, "bottom-left virtual pad = base 48 - 36")
+assert_eq(mock.find("AddNoteToVirtualPad")[9].args[3], 17, "row above starts a 4th higher")
 assert_eq(mock.leds[94][2], 127, "note button cyan in chromatic layout")
 assert_eq(mock.leds[94][1], 0, "note button cyan r")
 assert_eq(mock.leds[11][3], 127, "C note full blue b")
@@ -183,9 +183,9 @@ local function latestVirtual()
 	return all[#all - 63]
 end
 L.HandleMIDICC(0, 80, 127)
-assert_eq(latestVirtual().args[3], 60, "base shifted +12")
+assert_eq(latestVirtual().args[3], 24, "base shifted +12 (60 - 36)")
 L.HandleMIDICC(0, 70, 127)
-assert_eq(latestVirtual().args[3], 48, "base shifted back")
+assert_eq(latestVirtual().args[3], 12, "base shifted back (48 - 36)")
 -- third tap exits back to the clip grid; leaving chromatic resets the MPC pad bank
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
