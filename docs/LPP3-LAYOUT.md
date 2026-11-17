@@ -62,7 +62,7 @@ The user supplied the physical mapping. Use these CC numbers exactly.
 |---|---|---|---|
 | Grid 8x8 | notes 11-88 (10-note blocks: 11-18, 21-28, ..., 81-88) | clip launch (`TriggerClip(col, 7-padRow)`) | select clip (`SelectClip`) |
 | Track row | CC 101-108 | track select (`SelectTrack(globalPos(col,0))`) | — |
-| Function buttons | CC 1-8 | 1 record arm, 2 mute, 3 solo, 4 volume, 5 pan, 6 sends, 7 device, 8 stop clip | 1 undo, 2 redo, 3 click, 6 tap, 7 tempo, 8 swing |
+| Function buttons | CC 1-8 | 1 record arm, 2 mute, 3 solo, 4 volume, 5 pan, 6 sends, 7 device, 8 stop clip | 1 undo, 2 redo, 3 click, 6 cycle send, 7 tempo, 8 swing |
 | Right column | CC 19-89, 99 | 99 novation logo; 89-19 = `TriggerRow(0..7)` (89 = top, 19 = bottom) | 89 patterns → clip mode, 79 steps → step mode, 69 pattern settings → track mode, 59/49/39/29/19 = velocity/probability/mutation/micro step/print to clip (stub) |
 | Top row | CC 90-98 | 90 shift, 91 <, 92 >, 93 session, 94 note, 95 chord, 96 custom, 97 sequencer, 98 projects/save | — |
 | Left column | CC 10-80 | 10 record/capture midi, 20 play/stop toggle, 30 fixed length, 40 quantize/record quantize, 50 duplicate/double, 60 clear, 70 down, 80 up | — |
@@ -74,12 +74,13 @@ MPC action mapping (phase 1 clip mode first):
 - 93 session: clip mode; 97 sequencer: step mode (stub); 98 projects/save: save (stub).
 - 20 play: `IsPlaying` ? `Stop` : `Play`; 10 record: `Record`; 40 quantize / 50 duplicate / 60 clear: stubs.
 - Track row CC 101-108: `SelectTrack(globalPos(col,0))`; hold a function button (CC 1-8) then press a track button to apply it to that track.
-- Function buttons CC 1-8: record arm/mute/solo/volume/pan/sends/device/stop clip; Shift variants undo/redo/click/tap/tempo/swing.
+- Function buttons CC 1-8: record arm/mute/solo/volume/pan/sends/device/stop clip; Shift variants undo/redo/click/cycle send/tempo/swing.
 - 89/79/69 (Shift): clip/step/track modes; 59/49/39/29/19 (Shift): later phases (stub).
 - 99 novation logo: status/home; Shift = probe mode.
-- Q-links and track volume/pan/sends: later phases (stub).
+- Track volume/pan/sends: hold CC 4/5/6 + a track button, then use grid rows / up-down to adjust (see docs/MAPPING.md).
+- Q-links: later phase (stub).
 
-LED feedback (phase 1): grid = clip state per API-CONTRACT §3 — Ready = track colour solid; Playing = green pulse (ch3); WillPlay = flash (ch2); Recording = red pulse; queued states flash; Empty/NoSlot dark. Track row: the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour. Function buttons: the held one white, others dim. Shift: lit while held. LED cache per control; full repaint every ~2 s via timer (FL.lua:1378-1380 pattern).
+LED feedback (phase 1): grid = clip state per API-CONTRACT §3 — Ready = track colour solid; Playing = green pulse (ch3); WillPlay = flash (ch2); Recording = red pulse; queued states flash; Empty/NoSlot dark. Track row: the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour. Function buttons: the held or adjusted one white, others dim; adjustment mode paints the adjusted track's column as a cyan value bar. Shift: lit while held. LED cache per control; full repaint every ~2 s via timer (FL.lua:1378-1380 pattern).
 
 ## 5. Open questions (resolve on hardware, script must not assume)
 

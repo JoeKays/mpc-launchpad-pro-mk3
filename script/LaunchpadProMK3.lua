@@ -128,6 +128,9 @@ local ticks = 0
 local blinkOn = false
 local probeMode = false
 local heldFunction = nil
+local adjustMode = nil -- nil / "volume" / "pan" / "sends"
+local adjustTrack = nil -- global track index being adjusted
+local adjustSend = 1 -- 1..4, the active send in sends mode
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
 local layoutQuerySent = false
@@ -172,6 +175,41 @@ local function propValue(obj, name)
 	end)
 	if ok then
 		return v
+	end
+	return nil
+end
+
+local function clamp01(v)
+	v = tonumber(v) or 0
+	if v < 0 then
+		return 0
+	elseif v > 1 then
+		return 1
+	end
+	return v
+end
+
+local function trackAt(idx)
+	return mpc.tracks and mpc.tracks.normalTracks and mpc.tracks.normalTracks[idx]
+end
+
+local function trackLocalColumn(idx)
+	if aperture and aperture.ToLocalColumn then
+		local v = call(aperture.ToLocalColumn, idx)
+		if type(v) == "number" then
+			return v
+		end
+	end
+	return idx - (originCol or 0)
+end
+
+local function adjustPropName()
+	if adjustMode == "volume" then
+		return "Volume"
+	elseif adjustMode == "pan" then
+		return "Pan"
+	elseif adjustMode == "sends" then
+		return "Sends" .. adjustSend
 	end
 	return nil
 end
@@ -323,7 +361,38 @@ end
 -- Painting
 -----------------------------------------------------------------------------------------------
 
+local function paintAdjustGrid()
+	local localCol = trackLocalColumn(adjustTrack)
+	local t = trackAt(adjustTrack)
+	local name = adjustPropName()
+	local value = t and propValue(t, name) or 0
+	if type(value) ~= "number" then
+		value = 0
+	end
+	local litRow = math.floor(value * (GRID_ROWS - 1) + 0.5)
+	for row = 0, GRID_ROWS - 1 do
+		for col = 0, GRID_COLS - 1 do
+			local idx = 10 * (8 - row) + col + 1
+			local isActiveSend = adjustMode == "sends" and col <= 3 and col == adjustSend - 1
+			local isTrackCol = localCol ~= nil and col == localCol
+			if isActiveSend or isTrackCol then
+				if row <= litRow then
+					ledRGB(idx, C.cyan[1], C.cyan[2], C.cyan[3])
+				else
+					ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+				end
+			else
+				ledOff(idx)
+			end
+		end
+	end
+end
+
 local function paintGrid()
+	if adjustMode and adjustTrack ~= nil then
+		paintAdjustGrid()
+		return
+	end
 	for row = 0, GRID_ROWS - 1 do
 		for col = 0, GRID_COLS - 1 do
 			local idx = 10 * (8 - row) + col + 1
@@ -370,9 +439,9 @@ local function paintScene()
 end
 
 local function paintTrack()
-	-- CC 1-8: function buttons; the held one bright, others dim.
+	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
 	local function fnColour(fn)
-		if heldFunction == fn then
+		if heldFunction == fn or adjustMode == fn then
 			return C.white
 		else
 			return C.dim
@@ -381,12 +450,15 @@ local function paintTrack()
 	local arm = fnColour("recArm")
 	local mute = fnColour("mute")
 	local solo = fnColour("solo")
+	local volume = fnColour("volume")
+	local pan = fnColour("pan")
+	local sends = fnColour("sends")
 	ledRGB(TRACK.recArm, arm[1], arm[2], arm[3])
 	ledRGB(TRACK.mute, mute[1], mute[2], mute[3])
 	ledRGB(TRACK.solo, solo[1], solo[2], solo[3])
-	ledRGB(TRACK.volume, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(TRACK.pan, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(TRACK.sends, C.dim[1], C.dim[2], C.dim[3])
+	ledRGB(TRACK.volume, volume[1], volume[2], volume[3])
+	ledRGB(TRACK.pan, pan[1], pan[2], pan[3])
+	ledRGB(TRACK.sends, sends[1], sends[2], sends[3])
 	ledRGB(TRACK.device, C.dim[1], C.dim[2], C.dim[3])
 	ledRGB(TRACK.stopClip, C.dim[1], C.dim[2], C.dim[3])
 	-- CC 101-108: track buttons. Show the held function's state per track, or the track colour.
@@ -414,6 +486,9 @@ local function paintTrack()
 					r, g, b = scale7(cr * 0.3), scale7(cg * 0.3), scale7(cb * 0.3)
 				end
 			end
+		end
+		if adjustMode and gc == adjustTrack then
+			r, g, b = C.cyan[1], C.cyan[2], C.cyan[3]
 		end
 		ledRGB(101 + col, r, g, b)
 	end
@@ -652,7 +727,7 @@ local function applyFunction(fn, idx)
 		call(aperture and aperture.StopClipsOnTrack, idx)
 		log("StopClipsOnTrack(" .. idx .. ")")
 	else
-		log(fn .. ": TODO (track controls phase) track " .. idx)
+		log(fn .. ": unsupported track function " .. idx)
 	end
 end
 
@@ -661,6 +736,103 @@ local function selectTrack(idx)
 	if aperture then
 		call(aperture.SelectTrack, idx)
 		log("SelectTrack(" .. idx .. ")")
+	end
+end
+
+-- Write a track property (Volume/Pan/Sends1-4) through its .value, guarded.
+local function setTrackValue(idx, name, v)
+	local t = trackAt(idx)
+	if not t then
+		logOnce("track", "no track " .. tostring(idx))
+		return
+	end
+	local p = t[name]
+	if p == nil then
+		logOnce("prop" .. name, name .. " MISSING on track " .. tostring(idx))
+		return
+	end
+	local value = clamp01(v)
+	local ok = pcall(function()
+		p.value = value
+	end)
+	if not ok then
+		logOnce("set" .. name, "set " .. name .. " failed on track " .. tostring(idx))
+		return
+	end
+	log(string.format("%s track %d = %.3f", name, idx, value))
+end
+
+local function adjustValue(v)
+	if not adjustMode or adjustTrack == nil then
+		return
+	end
+	local name = adjustPropName()
+	if name then
+		setTrackValue(adjustTrack, name, v)
+		paintAll()
+	end
+end
+
+local function nudgeAdjust(delta)
+	if not adjustMode or adjustTrack == nil then
+		return
+	end
+	local t = trackAt(adjustTrack)
+	local name = adjustPropName()
+	if not (t and name) then
+		return
+	end
+	local cur = propValue(t, name)
+	if type(cur) ~= "number" then
+		cur = 0
+	end
+	adjustValue(cur + delta)
+end
+
+local function enterAdjust(fn, idx)
+	if not trackAt(idx) then
+		logOnce("track", "no track " .. tostring(idx))
+		return
+	end
+	adjustMode = fn
+	adjustTrack = idx
+	if fn == "sends" then
+		adjustSend = 1
+	end
+	selectTrack(idx)
+	log(string.format("adjust %s track %d", fn, idx))
+	paintAll()
+end
+
+local function exitAdjust()
+	if adjustMode then
+		adjustMode = nil
+		adjustTrack = nil
+		log("adjust off")
+		paintAll()
+	end
+end
+
+local function handleAdjustPad(col, row)
+	if not adjustMode or adjustTrack == nil then
+		return
+	end
+	local value = row / (GRID_ROWS - 1)
+	local localCol = trackLocalColumn(adjustTrack)
+	if adjustMode == "sends" then
+		if col >= 0 and col <= 3 then
+			adjustSend = col + 1
+			log("send " .. adjustSend)
+		end
+		if (col >= 0 and col <= 3) or (localCol ~= nil and col == localCol) then
+			adjustValue(value)
+		end
+	else
+		if localCol ~= nil and col == localCol then
+			adjustValue(value)
+		else
+			log(string.format("adjust %s: pad col %d ignored (track col %s)", adjustMode, col, tostring(localCol)))
+		end
 	end
 end
 
@@ -819,7 +991,11 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	local col, row = noteIndex(note)
 	if col then
 		if velocity > 0 then
-			doClip(col, row)
+			if adjustMode then
+				handleAdjustPad(col, row)
+			else
+				doClip(col, row)
+			end
 		end
 		return
 	end
@@ -896,6 +1072,10 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		moveWindow("right", shift and 8 or 1)
 		return
 	end
+	if adjustMode and (cc == LEFT.up or cc == LEFT.down) then
+		nudgeAdjust(cc == LEFT.up and 1 / 8 or -1 / 8)
+		return
+	end
 	if cc == LEFT.up then
 		moveWindow("up", shift and 8 or 1)
 		return
@@ -932,20 +1112,26 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	if fn then
 		if shift then
 			doShiftFunction(fn)
+			paintTrack()
+			flushLEDs()
 		else
 			heldFunction = fn
+			adjustMode = nil
+			adjustTrack = nil
 			log("hold " .. fn)
+			paintAll()
 		end
-		paintTrack()
-		flushLEDs()
 		return
 	end
 	if cc >= 101 and cc <= 108 then
 		local col = cc - 101
 		local gc = globalPos(col, 0)
-		if heldFunction then
+		if heldFunction == "volume" or heldFunction == "pan" or heldFunction == "sends" then
+			enterAdjust(heldFunction, gc)
+		elseif heldFunction then
 			applyFunction(heldFunction, gc)
 		else
+			exitAdjust()
 			selectTrack(gc)
 		end
 		return
@@ -1015,6 +1201,9 @@ end
 -----------------------------------------------------------------------------------------------
 
 function LaunchpadProMK3.OnLoad()
+	adjustMode = nil
+	adjustTrack = nil
+	adjustSend = 1
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
 	clipProps = (aperture and aperture.clipProperties)
 		or dev.clipProperties
@@ -1105,6 +1294,9 @@ end
 function LaunchpadProMK3.OnUnload()
 	call(dev.timer and dev.timer.Stop)
 	removeListeners()
+	adjustMode = nil
+	adjustTrack = nil
+	adjustSend = 1
 	if programmerEntered then
 		sendLayout(priorLayout or 0x04, priorPage or 0x00)
 		log("restored layout")

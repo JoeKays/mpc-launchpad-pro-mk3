@@ -26,9 +26,9 @@ function to that track. Without a held function, a track button selects the trac
 | 1 | record arm | undo |
 | 2 | mute | redo |
 | 3 | solo | click/metronome |
-| 4 | volume (stub) | — |
-| 5 | pan (stub) | — |
-| 6 | sends (stub) | tap tempo (stub) |
+| 4 | volume | — |
+| 5 | pan | — |
+| 6 | sends | cycle send 1-4 |
 | 7 | device (stub) | tempo (stub) |
 | 8 | stop clip | swing (stub) |
 
@@ -57,6 +57,29 @@ function is preserved (releasing the shift-function button does not clear it).
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
 leaves the surface working.
+
+### Track adjustment mode (volume / pan / sends)
+
+Hold volume (CC 4), pan (CC 5) or sends (CC 6) and press a track button (CC 101-108).
+The script selects the track under that grid column (`aperture.SelectTrack`) and enters
+an adjustment mode for that track. Release the function button to keep adjusting; the
+mode stays active until you press a track button without a held function or hold a
+different function button.
+
+In adjustment mode:
+
+| Action | Effect |
+|---|---|
+| Grid pad in the track's column | Sets the value to `row / 7` (row 0 = 0.0, row 7 = 1.0) |
+| Up (CC 80) | Nudges the value by +1/8, clamped to 0..1 |
+| Down (CC 70) | Nudges the value by -1/8, clamped to 0..1 |
+| Grid pad in columns 0-3 (sends) | Selects send `col + 1` and sets its value to `row / 7` |
+| Grid pad in the track's column (sends) | Sets the active send's value to `row / 7` |
+
+Volume and pan write `mpc.tracks.normalTracks[i].Volume.value` / `.Pan.value` (0..1,
+pan 0.5 = centre). Sends write `.Sends1`..`.Sends4.value` (0..1). The adjusted track's
+column and the active send column are lit as a value bar (cyan); the adjusted track
+button is cyan.
 
 ## Right column (CC 19-89 + 99)
 
@@ -113,6 +136,7 @@ own.
 - Grid: clip colour, dim when stopped, bright when playing/recording, blink when queued.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
+- Adjustment mode: the adjusted track's column (and the active send column) is a cyan value bar; the adjusted track button is cyan.
 - Function buttons (CC 1-8): the held one white, others dim.
 - Top row: current mode white, others dim; Shift white while held.
 - Left column: play green while playing, record red while recording.
