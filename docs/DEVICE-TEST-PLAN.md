@@ -76,11 +76,11 @@ journalctl -u acvs -o cat --no-pager | grep LaunchpadProMK3
 5. Hold CC 5 (pan), press CC 102 (track 1). Press the pad in column 1, row 4
    (note 42). Expect `Pan track 1 = 0.571`.
 6. Hold CC 6 (sends), press CC 103 (track 2). Press the pad in column 0, row 7
-   (note 11). Expect `send 1`, `Sends1 track 2 = 1.000`.
+   (note 11). Expect `send 1`, `Send1 track 2 = 1.000`.
 7. Press the pad in column 1, row 3 (note 52). Expect `send 2`,
-   `Sends2 track 2 = 0.429`.
+   `Send2 track 2 = 0.429`.
 8. Shift + CC 6. Expect `send 3`. Press the pad in column 2, row 7 (note 13).
-   Expect `Sends3 track 2 = 1.000`.
+   Expect `Send3 track 2 = 1.000`.
 9. Press CC 101 without a held function. Expect `adjust off` and `SelectTrack(0)`.
 
 ## 6. Transport

@@ -98,11 +98,20 @@ Device-verified 2026-11-17 on the MPC Live III (MPC 3.10.1, LPP3 on ALSA card 2)
 | Mapping matches script | PASS | `docs/MAPPING.md` vs `script/LaunchpadProMK3.lua` |
 | Limitations | PASS | `docs/LIMITATIONS.md` |
 
-## 9. Prioritized fix list
+## 9. Phase 2 lanes (clip ops, undo/redo, track controls)
+
+| Lane | Verdict | Evidence |
+|---|---|---|
+| Clip clear/duplicate | PASS (guarded) | `pressForce`, `doEdit`; `tests/test-clip-ops.lua`; `mpc.force.*` may be a no-op on non-Force hardware |
+| Undo/redo shift functions | PASS | `doShiftFunction` guards; held-function release fix; `tests/test-undo-redo.lua` |
+| Track volume/pan/sends | PASS | `enterAdjust`/`handleAdjustPad`/`nudgeAdjust`; `tests/test-track-controls.lua` |
+
+## 10. Prioritized fix list
 
 1. **Confirm the physical mapping on hardware** (probe mode): function buttons CC 1-8,
    track row CC 101-108, CC 30, top row 8 vs 9, Shift = CC 90.
-2. **Track controls**: implement volume/pan/sends/device (CC 4-7) in the next phase.
-3. **Q-links**: implement in a later phase (no encoders on the LPP3; pad-driven or CC).
-4. **Clip edits**: create/delete/quantize/copy, note editing on the selected clip.
+2. **Device-test clip clear/duplicate** (CC 50/60): `mpc.clipMatrix.CopyClip`/`DeleteClip`
+   are present in the 3.10.1 binary; confirm they work on the Live III.
+3. **Track device** (CC 7) remains a stub; Q-links are a later phase.
+4. **Clip edits**: quantize (CC 40), note editing on the selected clip.
 5. **Stop all clips**: a dedicated button (`clipMatrix.StopAllClips`).

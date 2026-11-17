@@ -33,6 +33,8 @@ local clipMatrix = {
   ClipIsStopped = function(gc, gr) return clips[gc] and clips[gc][gr] == "stopped" end,
   GetClipColour = function(gc, gr) return 0xFF0000 end,
   StopAllClips = function() record("StopAllClips") end,
+  DeleteClip = function(gc, gr) record("DeleteClip", gc, gr) end,
+  CopyClip = function(fc, fr, tc, tr) record("CopyClip", fc, fr, tc, tr) end,
 }
 
 -- tracks
@@ -46,10 +48,10 @@ for i = 0, 7 do
     Name = prop("Track " .. i),
     Volume = prop(0.5),
     Pan = prop(0.5),
-    Sends1 = prop(0),
-    Sends2 = prop(0),
-    Sends3 = prop(0),
-    Sends4 = prop(0),
+    Send1 = prop(0),
+    Send2 = prop(0),
+    Send3 = prop(0),
+    Send4 = prop(0),
   }
   t.SetRecArm = function(v) record("SetRecArm", i, v); t.RecArm:set(v) end
   t.SetMute = function(v) record("SetMute", i, v); t.Mute:set(v) end

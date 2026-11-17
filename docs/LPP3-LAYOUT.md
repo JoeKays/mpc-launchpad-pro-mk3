@@ -80,7 +80,7 @@ MPC action mapping (phase 1 clip mode first):
 - Track volume/pan/sends: hold CC 4/5/6 + a track button, then use grid rows / up-down to adjust (see docs/MAPPING.md).
 - Q-links: later phase (stub).
 
-LED feedback (phase 1): grid = clip state per API-CONTRACT §3 — Ready = track colour solid; Playing = green pulse (ch3); WillPlay = flash (ch2); Recording = red pulse; queued states flash; Empty/NoSlot dark. Track row: the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour. Function buttons: the held or adjusted one white, others dim; adjustment mode paints the adjusted track's column as a cyan value bar. Shift: lit while held. LED cache per control; full repaint every ~2 s via timer (FL.lua:1378-1380 pattern).
+LED feedback (phase 1): grid = clip state per API-CONTRACT §3 — Ready = track colour solid; Playing = green pulse (ch3); WillPlay = flash (ch2); Recording = red pulse; queued states flash; Empty/NoSlot dark. Track row: the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour. Function buttons: the held or active menu one white, others dim; the volume/pan/sends menu paints every track column as a value bar (cyan volume, magenta pan, yellow sends), filled from the bottom. Shift: lit while held. LED cache per control; full repaint every ~2 s via timer (FL.lua:1378-1380 pattern).
 
 ## 5. Open questions (resolve on hardware, script must not assume)
 

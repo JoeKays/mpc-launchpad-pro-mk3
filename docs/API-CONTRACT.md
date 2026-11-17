@@ -79,7 +79,7 @@ Members seen in logs (FL.lua:511-513 report walk; FINDINGS §18):
 ## 5. mpc.tracks
 
 - `mpc.tracks.normalTracks` — table indexed 0..N-1 (128 slots allocated whatever the project holds; guard with `.Count.value`, NK:89-94, APC:240-248). **Index = global clip-matrix column** (FINDINGS 30/33).
-- Per-track object members: `Colour` (number, listenable), `Name` (string, listenable), `Mute` (bool prop), `Solo` (bool prop), `RecArm` (bool prop), `Pan` (0..1, 0.5 centre), `Volume` (0..1), `Sends1-4`, `Type` (string, e.g. "Drum") — read/write via `.value`; setters `SetMute(bool)`, `SetSolo(bool)`, `SetRecArm(bool)`. (FL.lua:44-58 trk(); NK:171-206; CAPS; FINDINGS 33)
+- Per-track object members: `Colour` (number, listenable), `Name` (string, listenable), `Mute` (bool prop), `Solo` (bool prop), `RecArm` (bool prop), `Pan` (0..1, 0.5 centre), `Volume` (0..1), `Send1-4`, `Type` (string, e.g. "Drum") — read/write via `.value`; setters `SetMute(bool)`, `SetSolo(bool)`, `SetRecArm(bool)`. (FL.lua:44-58 trk(); NK:171-206; CAPS; FINDINGS 33)
 - `mpc.tracks.currentTrack` — has `Index` (number prop; counts normal tracks first, then master), `Name`, `Type`. APC:240-253; FL.lua:1290-1296.
 - `mpc.tracks.GetCount()` → number. FL.lua:1305.
 - **DO NOT USE**: `mpc.tracks.GetMute/SetMute/GetSolo/GetTrackRecordArmed/GetTrackInputPort/GetTrackInputChannel/GetTrackMonitorState` — registered on `mpc.tracks` but **error when called** in any form (`(self,i)`, `(i)`, `(i+1)`); use `normalTracks[i].<Prop>.value` / setters instead. (FINDINGS 30, 33; NK:135-155; FL.lua:1329-1336)

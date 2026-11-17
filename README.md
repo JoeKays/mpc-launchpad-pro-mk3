@@ -9,9 +9,9 @@ scripts as additional patterns.
 
 ## Status
 
-Phase 1 (clip mode) + transport + track row/function buttons are implemented and
-host-tested. Track controls (volume/pan/sends/device) and Q-links are stubbed for later
-phases.
+Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
+track volume/pan/sends are implemented and host-tested. Track device and Q-links are
+stubbed for later phases.
 
 ## What it does
 
@@ -26,8 +26,14 @@ phases.
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo.
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
 - **Function buttons**: CC 1-8 = record arm/mute/solo/volume/pan/sends/device/stop clip.
-  Hold a function button, then press a track button (CC 101-108) to apply it to that track.
+  Hold CC 1-3/7-8, then press a track button (CC 101-108) to apply it to that track.
   Shift + CC 1/2/3/6/7/8 = undo/redo/click/tap/tempo/swing.
+- **Clip edits**: CC 60 clear (arm, then press the clip pad), CC 50 duplicate (arm, press
+  the origin pad, then the target pad); CC 40 quantize is a stub.
+- **Track controls**: press volume/pan/sends (CC 4/5/6) to open a fader menu aligned with
+  the clip view; press a grid pad to set a track's value, up/down (CC 80/70, ±1/8) to
+  nudge, and press the function button again to exit. Shift + CC 6 cycles sends while the
+  sends menu is open. Volume/pan/sends write `normalTracks[i].Volume/Pan/Send1-4.value`.
 - **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
   clip/step/track modes.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the

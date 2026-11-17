@@ -18,17 +18,19 @@ upside down.
 
 ## Track row (CC 101-108) + function buttons (CC 1-8)
 
-Hold a function button (CC 1-8), then press a track button (CC 101-108) to apply that
-function to that track. Without a held function, a track button selects the track.
+Hold a function button (CC 1-3, 7-8), then press a track button (CC 101-108) to apply
+that function to that track. Without a held function, a track button selects the track.
+Volume, pan and sends (CC 4-6) are menus, not holds: press the button to enter the menu
+and press it again to exit.
 
 | CC | Function | Shift |
 |---|---|---|
 | 1 | record arm | undo |
 | 2 | mute | redo |
 | 3 | solo | click/metronome |
-| 4 | volume | — |
-| 5 | pan | — |
-| 6 | sends | cycle send 1-4 |
+| 4 | volume menu | — |
+| 5 | pan menu | — |
+| 6 | sends menu | cycle send 1-4 (while the sends menu is open) |
 | 7 | device (stub) | tempo (stub) |
 | 8 | stop clip | swing (stub) |
 
@@ -58,28 +60,24 @@ function is preserved (releasing the shift-function button does not clear it).
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
 leaves the surface working.
 
-### Track adjustment mode (volume / pan / sends)
+### Volume / pan / sends menus
 
-Hold volume (CC 4), pan (CC 5) or sends (CC 6) and press a track button (CC 101-108).
-The script selects the track under that grid column (`aperture.SelectTrack`) and enters
-an adjustment mode for that track. Release the function button to keep adjusting; the
-mode stays active until you press a track button without a held function or hold a
-different function button.
-
-In adjustment mode:
+Press volume (CC 4), pan (CC 5) or sends (CC 6) to open a fader menu. The grid becomes
+a bank of faders aligned with the clip view: each grid column is a track, each row is a
+level. The fader fills from the bottom (row 7 = 0.0) to the top (row 0 = 1.0). Press a
+pad in a column to set that track's value to `(7 - row) / 7`. Press the same function
+button again to exit the menu.
 
 | Action | Effect |
 |---|---|
-| Grid pad in the track's column | Sets the value to `row / 7` (row 0 = 0.0, row 7 = 1.0) |
-| Up (CC 80) | Nudges the value by +1/8, clamped to 0..1 |
-| Down (CC 70) | Nudges the value by -1/8, clamped to 0..1 |
-| Grid pad in columns 0-3 (sends) | Selects send `col + 1` and sets its value to `row / 7` |
-| Grid pad in the track's column (sends) | Sets the active send's value to `row / 7` |
+| Grid pad in column `c`, row `r` | Sets global track `c`'s value to `(7 - r) / 7` |
+| Up (CC 80) | Nudges the last touched track's value by +1/8, clamped to 0..1 |
+| Down (CC 70) | Nudges the last touched track's value by -1/8, clamped to 0..1 |
+| Shift + sends (CC 6) while the sends menu is open | Cycles send 1-4 |
 
 Volume and pan write `mpc.tracks.normalTracks[i].Volume.value` / `.Pan.value` (0..1,
-pan 0.5 = centre). Sends write `.Sends1`..`.Sends4.value` (0..1). The adjusted track's
-column and the active send column are lit as a value bar (cyan); the adjusted track
-button is cyan.
+pan 0.5 = centre). Sends write `.Send1`..`.Send4.value` (0..1). The faders are cyan
+(volume), magenta (pan) and yellow (sends); the active function button is white.
 
 ## Right column (CC 19-89 + 99)
 
@@ -119,24 +117,23 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 20 | play | `IsPlaying` ? `Stop` : `Play` |
 | 30 | fixed length | stub |
 | 40 | quantize/record quantize | stub (no clip-quantize API in the 3.10.1 contract) |
-| 50 | duplicate/double | `mpc.force.copy.Press()`/`Release()` on the selected clip; TODO if unavailable |
-| 60 | clear | `mpc.force.delete.Press()`/`Release()` on the selected clip; TODO if unavailable |
+| 50 | duplicate/double | arm duplicate, press the origin clip pad, then the target clip pad (`clipMatrix.CopyClip`) |
+| 60 | clear | arm clear, press the clip pad (`clipMatrix.DeleteClip`) |
 | 70 | down | window down (`MoveDown`); Shift = 8 |
 | 80 | up | window up (`MoveUp`); Shift = 8 |
 
-CC 50/60 use the virtual Force COPY/DELETE buttons (`mpc.force.copy`/`mpc.force.delete`),
-which act on MPC's current selection. The 3.10.1 contract has no clip-level duplicate/clear
-call. If `mpc.force` is absent (or the button lacks `Press`/`Release`), the script logs a
-TODO naming the missing API and does nothing. On non-Force hardware the buttons may be
-no-ops. The script only presses the buttons; the copy/paste and delete semantics are MPC's
-own.
+CC 50/60 use `mpc.clipMatrix.CopyClip(fromColumn, fromRow, toColumn, toRow)` and
+`mpc.clipMatrix.DeleteClip(column, row)`. Press CC 50 to arm duplicate, press the origin
+clip pad, then the target clip pad. Press CC 60 to arm clear, then press the clip pad.
+The calls are guarded: if the API is missing the script logs the attempted call and
+leaves the surface working.
 
 ## LED feedback
 
 - Grid: clip colour, dim when stopped, bright when playing/recording, blink when queued.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
-- Adjustment mode: the adjusted track's column (and the active send column) is a cyan value bar; the adjusted track button is cyan.
+- Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, yellow sends), filled from the bottom.
 - Function buttons (CC 1-8): the held one white, others dim.
 - Top row: current mode white, others dim; Shift white while held.
 - Left column: play green while playing, record red while recording.

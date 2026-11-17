@@ -24,14 +24,14 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | Limit | Status |
 |---|---|
 | **Q-links** | Not implemented (later phase). |
-| **Track adjustment mode** | Grid pads set 8 discrete values (`row / 7`); up/down nudge by 1/8. No finer control. |
+| **Volume/pan/sends menus** | Grid pads set 8 discrete values (`(7 - row) / 7`); up/down nudge by 1/8. No finer control. |
 | **Track device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
 | **Save/quantize** | Stubbed with `TODO` logs. |
-| **Duplicate/clear** | Implemented via `mpc.force.copy`/`mpc.force.delete` `Press()`/`Release()` on MPC's current selection. No clip-level duplicate/clear API exists in the 3.10.1 contract; if `mpc.force` is absent the buttons log a TODO naming the missing API. |
-| **`mpc.force.*` buttons** | Firmware-specific; may be absent or a no-op on non-Force hardware (FINDINGS 30). |
-| **Track volume/pan/sends** | Implemented: hold CC 4/5/6 + a track button, then use the grid rows or up/down to adjust; sends use grid columns 0-3 to pick send 1-4. |
+| **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: arm CC 50/60, then press the origin/target or clip pad. If the API is missing the script logs the attempted call and does nothing. |
+| **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
+| **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; Shift + CC 6 cycles sends while the sends menu is open. |
 | **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome; Shift + CC 6/7/8 = tap tempo/tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
@@ -45,5 +45,5 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 - Missing clipProperties → grid dark, clip launch still works via `mpc.clipMatrix`.
 - Missing sequencer → transport buttons and Shift + CC 3 metronome inert, no crash.
 - Missing commandManager → Shift + CC 1/2 undo/redo inert, no crash.
-- Missing `mpc.force` → duplicate/clear log a TODO naming the missing API, no crash.
+- Missing `mpc.clipMatrix.CopyClip`/`DeleteClip` → duplicate/clear log the attempted call, no crash.
 - Every optional API is behind `pcall`/nil checks; failures log once and continue.
