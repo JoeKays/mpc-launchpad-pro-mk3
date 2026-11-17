@@ -489,6 +489,46 @@ local mpc = {
 				record("quantizeApply.Release")
 			end,
 		},
+		keyboardControl = {
+			Press = function()
+				record("keyboardControl.Press")
+			end,
+			Release = function()
+				record("keyboardControl.Release")
+			end,
+		},
+		chord = {
+			Press = function()
+				record("chord.Press")
+			end,
+			Release = function()
+				record("chord.Release")
+			end,
+		},
+		stepSeq = {
+			Press = function()
+				record("stepSeq.Press")
+			end,
+			Release = function()
+				record("stepSeq.Release")
+			end,
+		},
+		stepSeqNext = {
+			Press = function()
+				record("stepSeqNext.Press")
+			end,
+			Release = function()
+				record("stepSeqNext.Release")
+			end,
+		},
+		save = {
+			Press = function()
+				record("save.Press")
+			end,
+			Release = function()
+				record("save.Release")
+			end,
+		},
 	},
 	ui = {
 		ShowTUIFeedback = function(s)

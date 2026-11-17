@@ -157,6 +157,7 @@ local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
 local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
+local padUtility = "off" -- CC 95 cycles the MPC's own pad modes: keyboard -> chord -> off
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
@@ -1121,6 +1122,8 @@ local function paintTrack()
 	end
 end
 
+local padUtilityAvailable -- forward declaration (defined with the pad-mode helpers)
+
 local function paintTop()
 	local function modeColour(m)
 		if mode == m then
@@ -1133,7 +1136,12 @@ local function paintTop()
 	local session = followMode and C.cyan or modeColour("clip")
 	local sequencer = modeColour("step")
 	local note = padsMode and C.white or (padsModeAvailable() and C.available or C.off)
-	local chord = modeColour("chord")
+	local chord = C.off
+	if padsMode and padUtility ~= "off" then
+		chord = C.white
+	elseif padsMode and padUtilityAvailable() then
+		chord = C.available
+	end
 	local custom = C.off -- stub (mutes live on the CC 2 hold-function)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
@@ -1142,7 +1150,13 @@ local function paintTop()
 	ledRGB(TOP.custom, custom[1], custom[2], custom[3])
 	ledRGB(TOP.left, C.dim[1], C.dim[2], C.dim[3])
 	ledRGB(TOP.right, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(TOP.save, C.dim[1], C.dim[2], C.dim[3])
+	local saveAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.save ~= nil
+	ledRGB(
+		TOP.save,
+		saveAvailable and C.available[1] or C.dim[1],
+		saveAvailable and C.available[2] or C.dim[2],
+		saveAvailable and C.available[3] or C.dim[3]
+	)
 	ledRGB(
 		TOP.shift,
 		shift and C.white[1] or C.dim[1],
@@ -1394,11 +1408,66 @@ local function padsModeNote(i)
 end
 
 -- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
+-- The MPC's own pad modes (chromatic keyboard, chords) are toggled by pressing the
+-- control-surface buttons; CC 95 cycles them while MPC Pads mode owns the grid.
+local PAD_UTILITY_BUTTONS = { keyboard = "keyboardControl", chord = "chord" }
+
+local function pressSurfaceButton(name)
+	local b = mpc.controlSurface and mpc.controlSurface[name]
+	if b and type(b.Press) == "function" then
+		call(b.Press)
+		call(b.Release)
+		return true
+	end
+	return false
+end
+
+padUtilityAvailable = function()
+	local cs = mpc.controlSurface
+	if not (cs and cs.keyboardControl and cs.chord) then
+		return false
+	end
+	return true
+end
+
+local function clearPadUtility()
+	if padUtility ~= "off" then
+		pressSurfaceButton(PAD_UTILITY_BUTTONS[padUtility])
+		padUtility = "off"
+	end
+end
+
+local function cyclePadUtility()
+	if not padsMode then
+		logOnce("padutility", "pad modes: enter MPC pads mode (CC 94) first")
+		return
+	end
+	if not padUtilityAvailable() then
+		logOnce("padutility", "pad modes unavailable: controlSurface buttons missing")
+		return
+	end
+	if padUtility == "off" then
+		pressSurfaceButton("keyboardControl")
+		padUtility = "keyboard"
+	elseif padUtility == "keyboard" then
+		pressSurfaceButton("keyboardControl") -- off
+		pressSurfaceButton("chord")
+		padUtility = "chord"
+	else
+		pressSurfaceButton("chord") -- off
+		padUtility = "off"
+	end
+	log("pad mode: " .. padUtility)
+	paintTop()
+	flushLEDs()
+end
+
 local function exitPadsMode()
 	if not padsMode then
 		return
 	end
 	padsMode = false
+	clearPadUtility()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
 	for i = 0, 15 do
@@ -2074,7 +2143,18 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.sequencer then
-		setMode("step")
+		if shift then
+			if pressSurfaceButton("stepSeqNext") then
+				log("step seq: next")
+			else
+				logOnce("stepseqnext", "step seq next unavailable: controlSurface.stepSeqNext missing")
+			end
+		elseif pressSurfaceButton("stepSeq") then
+			setMode("step")
+			log("step seq view")
+		else
+			logOnce("stepseq", "step seq unavailable: controlSurface.stepSeq missing")
+		end
 		return
 	end
 	if shift and cc == TOP.note then
@@ -2083,6 +2163,10 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if shift and cc == TOP.chord then
 		doPluginPreset(true)
+		return
+	end
+	if cc == TOP.chord then
+		cyclePadUtility()
 		return
 	end
 	if cc == TOP.note then
@@ -2197,7 +2281,15 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.save then
-		log("save: TODO")
+		if shift then
+			if pressSurfaceButton("save") then
+				log("save")
+			else
+				logOnce("save", "save unavailable: controlSurface.save missing")
+			end
+		else
+			log("projects: TODO")
+		end
 		return
 	end
 	local fn = TRACK_FN[cc]
@@ -2359,6 +2451,7 @@ function LaunchpadProMK3.OnLoad()
 	qlinkCol = 0
 	followMode = false
 	padsMode = false
+	padUtility = "off"
 	padsColourCache = {}
 	clipOp = nil
 	clipOrigin = nil

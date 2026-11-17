@@ -201,6 +201,30 @@ assert_eq(lastLog(), "LaunchpadProMK3: follow: off", "follow toggle off")
 assert_eq(mock.leds[93][1], 127, "session button white again after follow off")
 L.HandleMIDICC(0, 90, 0)
 
+-- Shift + CC 98 = save via controlSurface.save.
+L.HandleMIDICC(0, 90, 127)
+L.HandleMIDICC(0, 98, 127)
+assert_eq(mock.count("save.Press"), 1, "save pressed")
+assert_eq(lastLog(), "LaunchpadProMK3: save", "save logged")
+L.HandleMIDICC(0, 98, 0)
+L.HandleMIDICC(0, 90, 0)
+-- Unshifted CC 98 stays a stub.
+mock.reset()
+L.HandleMIDICC(0, 98, 127)
+assert_eq(mock.count("save.Press"), 0, "no save without Shift")
+assert_eq(lastLog(), "LaunchpadProMK3: projects: TODO", "projects stub log")
+
+-- CC 97 opens the step seq view; Shift + CC 97 steps to the next bar.
+mock.reset()
+L.HandleMIDICC(0, 97, 127)
+assert_eq(mock.count("stepSeq.Press"), 1, "stepSeq pressed")
+assert_eq(lastLog(), "LaunchpadProMK3: step seq view", "step seq view logged")
+L.HandleMIDICC(0, 90, 127)
+L.HandleMIDICC(0, 97, 127)
+assert_eq(mock.count("stepSeqNext.Press"), 1, "stepSeqNext pressed")
+assert_eq(lastLog(), "LaunchpadProMK3: step seq: next", "step seq next logged")
+L.HandleMIDICC(0, 90, 0)
+
 local savedLoop = mock.mpc.sequencer.Loop
 mock.mpc.sequencer.Loop = nil
 L.HandleMIDICC(0, 90, 127)
