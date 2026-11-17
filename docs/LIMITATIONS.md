@@ -27,7 +27,9 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Track volume/pan/sends/device** | Stubbed with `TODO` logs (later phase). |
 | **Velocity/probability/mutation/micro-step/print-to-clip pages** | Stubbed with `TODO` logs. |
 | **Note/chord/custom modes** | Stubbed; the script only switches the mode label. |
-| **Save/quantize/duplicate/clear** | Stubbed with `TODO` logs. |
+| **Save/quantize** | Stubbed with `TODO` logs. |
+| **Duplicate/clear** | Implemented via `mpc.force.copy`/`mpc.force.delete` `Press()`/`Release()` on MPC's current selection. No clip-level duplicate/clear API exists in the 3.10.1 contract; if `mpc.force` is absent the buttons log a TODO naming the missing API. |
+| **`mpc.force.*` buttons** | Firmware-specific; may be absent or a no-op on non-Force hardware (FINDINGS 30). |
 | **Swing/tap tempo/tempo** | Shift + CC 8/6/7 stubbed with `TODO` logs. |
 | **Shift functions** | Shift + CC 1/2 = undo/redo, Shift + CC 3 = click/metronome; Shift + CC 6/7/8 = tap tempo/tempo/swing stubs. Shift functions work while a function button is held; the held function is preserved. |
 | **Scene launch on right column CC 89-19** | Implemented; confirm the physical row on hardware. |
@@ -41,4 +43,5 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 - Missing clipProperties → grid dark, clip launch still works via `mpc.clipMatrix`.
 - Missing sequencer → transport buttons and Shift + CC 3 metronome inert, no crash.
 - Missing commandManager → Shift + CC 1/2 undo/redo inert, no crash.
+- Missing `mpc.force` → duplicate/clear log a TODO naming the missing API, no crash.
 - Every optional API is behind `pcall`/nil checks; failures log once and continue.
