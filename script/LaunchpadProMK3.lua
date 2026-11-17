@@ -505,8 +505,10 @@ local function paintTempoGrid()
 		widths[1] = 4
 		widths[2] = 4
 	end
-	-- colour by position from the right: ones green, tens yellow, hundreds cyan
-	local colours = { C.green, C.yellow, C.cyan }
+	-- colour by position from the right: ones white (brightest), tens orange,
+	-- hundreds blue. Blue/orange/white differ in both hue and luminance, so the
+	-- digits stay distinct for red-green colourblindness (the common type).
+	local colours = { C.white, C.orange, C.blue }
 	local x0 = 0
 	for i = 1, #text do
 		drawDigit(text:sub(i, i), x0, 0, widths[i], GRID_ROWS, colours[#text - i + 1])
