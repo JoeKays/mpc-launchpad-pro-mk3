@@ -1513,6 +1513,7 @@ end
 function LaunchpadProMK3.OnLoad()
 	adjustMode = nil
 	adjustSend = 1
+	tempoMode = false
 	clipOp = nil
 	clipOrigin = nil
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
@@ -1607,6 +1608,7 @@ function LaunchpadProMK3.OnUnload()
 	removeListeners()
 	adjustMode = nil
 	adjustSend = 1
+	tempoMode = false
 	clipOp = nil
 	clipOrigin = nil
 	if programmerEntered then
