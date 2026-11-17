@@ -16,16 +16,18 @@
 --                        104 volume     (stub)
 --                        105 pan        (stub)
 --                        106 sends      / Shift tap tempo
---                        107 device     / Shift tempo
+--                        107 device (Q-Link page) / Shift tempo
 --                        108 stop clip  / Shift swing
 --   right column CC 19-89 + 99
 --                        99 novation logo (status/home; Shift = probe mode)
 --                        89 patterns, 79 steps, 69 pattern settings,
 --                        59 velocity, 49 probability, 39 mutation, 29 micro step, 19 print to clip
---   top row CC 90-98     90 shift, 91 <, 92 >, 93 session, 94 note, 95 chord,
+--   top row CC 90-98     90 shift, 91 < (Shift = track prev), 92 > (Shift = track next),
+--                        93 session, 94 note (Shift = preset prev), 95 chord (Shift = preset next),
 --                        96 custom, 97 sequencer, 98 projects/save
---   left column CC 10-80 10 record/capture midi, 20 play, 30 fixed length,
---                        40 quantize/record quantize, 50 duplicate/double, 60 clear,
+--   left column CC 10-80 10 record (Shift = overdub), 20 play (Shift = loop toggle),
+--                        30 fixed length (Shift = automation filter cycle),
+--                        40 quantize (Shift = quantiser toggle), 50 duplicate/double, 60 clear,
 --                        70 down, 80 up
 --
 -- LED protocol: F0 00 20 29 02 0E 03 <spec>... F7; spec = <type> <index> <data>.
@@ -148,7 +150,11 @@ local tempoHoldTicks = 0 -- ticks since the tempo button was pressed
 local swingMode = false -- Shift+CC8 swing page: up/down change swing
 local swingHold = nil -- LEFT.up / LEFT.down while held (auto-repeat)
 local swingHoldTicks = 0 -- ticks since the swing button was pressed
+local qlinkMode = false -- CC7 device page: Q-Link faders (Twist-driven)
+local qlinkPage = 0 -- 0 = Q-Links 0-7, 1 = Q-Links 8-15
+local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
+local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
 local layoutQuerySent = false
@@ -574,6 +580,141 @@ local function paintAdjustGrid()
 	end
 end
 
+-----------------------------------------------------------------------------------------------
+-- Q-Link page (CC 7 device). SetPosition updates the ValueString but does not reach the
+-- MPC edit-mode value on 3.10.1, so changes are driven with Twist (rotate by delta) instead.
+-----------------------------------------------------------------------------------------------
+
+local paintAll -- forward declaration (defined below)
+
+local function qlinkAt(i)
+	local cs = mpc.controlSurface
+	local ql = cs and cs.qlinks
+	if not ql then
+		return nil
+	end
+	return ql[i]
+end
+
+local function qlinkCount()
+	local cs = mpc.controlSurface
+	local ql = cs and cs.qlinks
+	if not ql then
+		return 0
+	end
+	return call(ql.GetNumQLinks) or 0
+end
+
+local function qlinkPosition(i)
+	local q = qlinkAt(i)
+	if not q then
+		return 0
+	end
+	return call(q.GetPosition) or 0
+end
+
+-- Touch() signature is unknown on 3.10.1: try it with no args, ignore any error.
+local function touchQlink(q)
+	if q and type(q.Touch) == "function" then
+		pcall(q.Touch)
+	end
+end
+
+-- Drive qlink i to pos: Twist(target - GetPosition()), clamped to +-127, repeated at most
+-- twice to absorb the GetPosition lag; falls back to SetPosition when Twist is missing.
+local function setQlinkPosition(i, pos)
+	local q = qlinkAt(i)
+	if not q then
+		return
+	end
+	if type(q.Twist) ~= "function" then
+		call(q.SetPosition, pos)
+		log(string.format("qlink %d = %d (setpos)", i, pos))
+		return
+	end
+	touchQlink(q)
+	for _ = 1, 2 do
+		local delta = pos - (call(q.GetPosition) or 0)
+		if delta == 0 then
+			break
+		end
+		if delta > 127 then
+			delta = 127
+		elseif delta < -127 then
+			delta = -127
+		end
+		call(q.Twist, delta)
+	end
+	touchQlink(q)
+	log(string.format("qlink %d = %d (%s)", i, pos, tostring(call(q.GetValueString) or "")))
+end
+
+local function paintQlinkGrid()
+	local count = qlinkCount()
+	for col = 0, GRID_COLS - 1 do
+		local i = qlinkPage * GRID_COLS + col
+		local pos = (i < count) and qlinkPosition(i) or 0
+		local litCount = math.floor(pos / 127 * GRID_ROWS + 0.5)
+		for row = 0, GRID_ROWS - 1 do
+			local idx = 10 * (8 - row) + col + 1
+			local fromBottom = 7 - row
+			if i < count and fromBottom < litCount then
+				ledRGB(idx, C.cyan[1], C.cyan[2], C.cyan[3])
+			else
+				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+			end
+		end
+	end
+end
+
+local function handleQlinkPad(col, row)
+	local i = qlinkPage * GRID_COLS + col
+	if i >= qlinkCount() then
+		return
+	end
+	local target = math.floor((GRID_ROWS - row) / GRID_ROWS * 127 + 0.5)
+	setQlinkPosition(i, target)
+	qlinkCol = col
+	paintAll()
+end
+
+local function nudgeQlink(delta)
+	local i = qlinkPage * GRID_COLS + qlinkCol
+	local q = qlinkAt(i)
+	if not q or type(q.Twist) ~= "function" or i >= qlinkCount() then
+		return
+	end
+	local pos = qlinkPosition(i)
+	if pos + delta < 0 or pos + delta > 127 then
+		return
+	end
+	call(q.Twist, delta)
+	log(string.format("qlink %d = %d (%s)", i, pos + delta, tostring(call(q.GetValueString) or "")))
+	paintAll()
+end
+
+local function enterQlink()
+	local cs = mpc.controlSurface
+	if not (cs and cs.qlinks) then
+		logOnce("noqlinks", "qlink page unavailable: controlSurface.qlinks missing")
+		return
+	end
+	adjustMode = nil
+	tempoMode = false
+	swingMode = false
+	qlinkMode = true
+	qlinkPage = 0
+	qlinkCol = 0
+	log("qlink page")
+	paintAll()
+end
+
+local function exitQlink()
+	qlinkMode = false
+	log("qlink page off")
+	paintAll()
+end
+
 local function paintGrid()
 	if tempoMode then
 		paintTempoGrid()
@@ -581,6 +722,10 @@ local function paintGrid()
 	end
 	if swingMode then
 		paintSwingGrid()
+		return
+	end
+	if qlinkMode then
+		paintQlinkGrid()
 		return
 	end
 	if adjustMode then
@@ -636,7 +781,8 @@ local function paintTrack()
 	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
 	local function fnAvailable(fn)
 		if fn == "device" then
-			return mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil
+			local cs = mpc.controlSurface
+			return (cs and cs.qlinks ~= nil) or (mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil)
 		elseif fn == "stopClip" then
 			return aperture ~= nil and aperture.StopClipsOnTrack ~= nil
 		end
@@ -646,7 +792,7 @@ local function paintTrack()
 		if
 			heldFunction == fn
 			or adjustMode == fn
-			or (fn == "device" and tempoMode)
+			or (fn == "device" and (tempoMode or qlinkMode))
 			or (fn == "stopClip" and swingMode)
 		then
 			return C.white
@@ -756,8 +902,8 @@ local function paintLeft()
 		quantizeAvailable and C.white[2] or C.off[2],
 		quantizeAvailable and C.white[3] or C.off[3]
 	)
-	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode
-	local pageColour = tempoMode and C.white or (swingMode and C.yellow or adjustColour())
+	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
+	local pageColour = tempoMode and C.white or (swingMode and C.yellow or (qlinkMode and C.cyan or adjustColour()))
 	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
 	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
 	ledRGB(
@@ -785,7 +931,7 @@ local function paintRight()
 	)
 end
 
-local function paintAll()
+paintAll = function()
 	paintGrid()
 	paintScene()
 	paintTrack()
@@ -1081,6 +1227,7 @@ end
 local function enterAdjust(newMode)
 	tempoMode = false
 	swingMode = false
+	qlinkMode = false
 	adjustMode = newMode
 	adjustCol = 0
 	lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
@@ -1175,6 +1322,37 @@ local function doTapTempo()
 	end
 end
 
+-- While Shift is held, CC 6 is handed to the MPC's own Tap Tempo control
+-- (RemoveCCToScript + AddCCToControl, the stock MPK mini IV pattern); on Shift
+-- release it is routed back to the script for the sends menu. Without the
+-- controlSurface mapping the doTapTempo() averager stays the fallback.
+local function updateTapTempoRouting(held)
+	local m = dev.mappings and dev.mappings.script
+	local cs = dev.mappings and dev.mappings.controlSurface
+	if held and cs and type(cs.AddCCToControl) == "function" and type(cs.RemoveCCToControl) == "function" then
+		local ok = pcall(function()
+			m.RemoveCCToScript(0, LEFT.sends)
+			cs.AddCCToControl(0, LEFT.sends, "Tap Tempo")
+		end)
+		if ok then
+			nativeTap = true
+			logOnce("tapnative", "tap tempo: native")
+			return
+		end
+	end
+	if nativeTap then
+		call(cs.RemoveCCToControl, 0, LEFT.sends)
+		call(m.AddCCToScript, 0, LEFT.sends)
+		nativeTap = false
+	elseif held then
+		-- a failed bind may have left CC 6 unregistered: keep it on the script
+		call(m.AddCCToScript, 0, LEFT.sends)
+	end
+	if held then
+		logOnce("tapmanual", "tap tempo: manual fallback")
+	end
+end
+
 local function doShiftFunction(fn)
 	if fn == "recArm" then
 		local cm = mpc.commandManager
@@ -1202,10 +1380,15 @@ local function doShiftFunction(fn)
 			logOnce("metronome", "metronome unavailable: sequencer.SetMetronomeEnabled missing")
 		end
 	elseif fn == "sends" then
-		doTapTempo()
+		-- CC 6 is routed to the MPC's native Tap Tempo while Shift is held;
+		-- this manual averager only runs when that binding is unavailable
+		if not nativeTap then
+			doTapTempo()
+		end
 	elseif fn == "device" then
 		adjustMode = nil
 		swingMode = false
+		qlinkMode = false
 		tempoMode = not tempoMode
 		tempoHold = nil
 		if tempoMode then
@@ -1218,6 +1401,7 @@ local function doShiftFunction(fn)
 	elseif fn == "stopClip" then
 		adjustMode = nil
 		tempoMode = false
+		qlinkMode = false
 		tempoHold = nil
 		swingMode = not swingMode
 		swingHold = nil
@@ -1252,6 +1436,90 @@ local function doTransport(fn)
 		call(sq and sq.Record)
 		log("Record")
 	end
+end
+
+-- Shift + play (CC 20): loop on/off (Loop is a userdata property with .value).
+local function doLoopToggle()
+	local sq = mpc.sequencer
+	local loop = propValue(sq, "Loop")
+	if not sq or sq.Loop == nil then
+		logOnce("loop", "loop unavailable: sequencer.Loop missing")
+		return
+	end
+	local ok = pcall(function()
+		sq.Loop.value = not loop
+	end)
+	if not ok then
+		logOnce("loopwrite", "loop unavailable: sequencer.Loop.value not writable")
+		return
+	end
+	log("loop: " .. (loop and "off" or "on"))
+end
+
+-- Shift + record (CC 10): overdub (a plain sequencer function).
+local function doOverdub()
+	local sq = mpc.sequencer
+	if not (sq and type(sq.Overdub) == "function") then
+		logOnce("overdub", "overdub unavailable: sequencer.Overdub missing")
+		return
+	end
+	call(sq.Overdub)
+	log("overdub")
+end
+
+-- Shift + quantize (CC 40): quantiser on/off (Enabled is userdata with .value).
+local function doQuantiserToggle()
+	local sq = mpc.sequencer
+	local q = sq and sq.quantiser
+	local enabled = propValue(q, "Enabled")
+	if not q or q.Enabled == nil then
+		logOnce("quantiser", "quantiser unavailable: sequencer.quantiser.Enabled missing")
+		return
+	end
+	local ok = pcall(function()
+		q.Enabled.value = not enabled
+	end)
+	if not ok then
+		logOnce("quantiserwrite", "quantiser unavailable: Enabled.value not writable")
+		return
+	end
+	log("quantiser: " .. (enabled and "off" or "on"))
+end
+
+-- Shift + fixed length (CC 30): cycle the global automation filter type.
+local function doAutomationFilterCycle()
+	local pr = mpc.project
+	if not (pr and type(pr.AdvanceGlobalAutomationFilterType) == "function") then
+		logOnce("autofilter", "automation filter unavailable: project.AdvanceGlobalAutomationFilterType missing")
+		return
+	end
+	call(pr.AdvanceGlobalAutomationFilterType)
+	log("automation filter: cycled")
+end
+
+-- Shift + < / > (CC 91/92): MPC's current track previous/next.
+local function doTrackNav(forward)
+	local ct = mpc.tracks and mpc.tracks.currentTrack
+	local f = forward and "Next" or "Previous"
+	if not (ct and type(ct[f]) == "function") then
+		logOnce("tracknav", "track nav unavailable: currentTrack." .. f .. " missing")
+		return
+	end
+	call(ct[f])
+	log("track: " .. (forward and "next" or "prev"))
+end
+
+-- Shift + note/chord (CC 94/95): previous/next plugin preset on the current
+-- track (present on track objects in 3.10.1).
+local function doPluginPreset(forward)
+	local ct = mpc.tracks and mpc.tracks.currentTrack
+	local f = forward and "NextPluginPreset" or "PrevPluginPreset"
+	if not (ct and type(ct[f]) == "function") then
+		logOnce("preset", "preset unavailable: currentTrack." .. f .. " missing")
+		return
+	end
+	call(ct[f])
+	log("preset: " .. (forward and "next" or "prev"))
 end
 
 local function moveWindow(dir, n)
@@ -1329,6 +1597,8 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 				end
 			elseif adjustMode then
 				handleAdjustPad(col, row)
+			elseif qlinkMode then
+				handleQlinkPad(col, row)
 			elseif not tempoMode and not swingMode then
 				doClip(col, row)
 			end
@@ -1352,6 +1622,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	if value == 0 then
 		if cc == TOP.shift then
 			shift = false
+			updateTapTempoRouting(false)
 			paintTop()
 			flushLEDs()
 		end
@@ -1379,6 +1650,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if cc == TOP.shift then
 		shift = true
+		updateTapTempoRouting(true)
 		paintTop()
 		flushLEDs()
 		return
@@ -1402,6 +1674,14 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		setMode("step")
 		return
 	end
+	if shift and cc == TOP.note then
+		doPluginPreset(false)
+		return
+	end
+	if shift and cc == TOP.chord then
+		doPluginPreset(true)
+		return
+	end
 	for row = 0, 7 do
 		if cc == SCENE[row + 1] then
 			if shift then
@@ -1413,11 +1693,19 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		end
 	end
 	if cc == TOP.left then
-		moveWindow("left", shift and 8 or 1)
+		if shift then
+			doTrackNav(false)
+		else
+			moveWindow("left", 1)
+		end
 		return
 	end
 	if cc == TOP.right then
-		moveWindow("right", shift and 8 or 1)
+		if shift then
+			doTrackNav(true)
+		else
+			moveWindow("right", 1)
+		end
 		return
 	end
 	if tempoMode and (cc == LEFT.up or cc == LEFT.down) then
@@ -1436,6 +1724,16 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		nudgeAdjust(cc == LEFT.up and 1 / 8 or -1 / 8)
 		return
 	end
+	if qlinkMode and (cc == LEFT.up or cc == LEFT.down) then
+		if shift then
+			nudgeQlink(cc == LEFT.up and 1 or -1)
+		else
+			qlinkPage = (qlinkPage == 0) and 1 or 0
+			log("qlink bank " .. (qlinkPage + 1))
+			paintAll()
+		end
+		return
+	end
 	if cc == LEFT.up then
 		moveWindow("up", shift and 8 or 1)
 		return
@@ -1445,15 +1743,31 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == LEFT.play then
-		doTransport("play")
+		if shift then
+			doLoopToggle()
+		else
+			doTransport("play")
+		end
 		return
 	end
 	if cc == LEFT.record then
-		doTransport("record")
+		if shift then
+			doOverdub()
+		else
+			doTransport("record")
+		end
+		return
+	end
+	if shift and cc == LEFT.fixedLength then
+		doAutomationFilterCycle()
 		return
 	end
 	if cc == LEFT.quantize then
-		doQuantize()
+		if shift then
+			doQuantiserToggle()
+		else
+			doQuantize()
+		end
 		return
 	end
 	if cc == LEFT.duplicate then
@@ -1494,6 +1808,12 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			else
 				enterAdjust(fn)
 			end
+		elseif fn == "device" then
+			if qlinkMode then
+				exitQlink()
+			else
+				enterQlink()
+			end
 		else
 			heldFunction = fn
 			adjustMode = nil
@@ -1525,6 +1845,19 @@ function LaunchpadProMK3.HandleMIDISysex(bytes)
 	end
 	if bytes:byte(-1) == 0xF7 then
 		bytes = bytes:sub(1, -2)
+	end
+	-- device identity reply: 7E <dev> 06 02 <00 20 29 Novation> <family> <model> <version...>
+	if
+		bytes:byte(1) == 0x7E
+		and bytes:byte(3) == 0x06
+		and bytes:byte(4) == 0x02
+		and bytes:sub(5, 7) == string.char(0x00, 0x20, 0x29)
+	then
+		local ver = {}
+		for i = 12, math.min(14, #bytes) do
+			ver[#ver + 1] = tostring(bytes:byte(i))
+		end
+		logOnce("firmware", "firmware: " .. (#ver > 0 and table.concat(ver, ".") or "unknown"))
 	end
 	-- select layout: 00 20 29 02 0E 00 <layout> <page> 00
 	if bytes:sub(1, 6) == string.char(0x00, 0x20, 0x29, 0x02, 0x0E, 0x00) and #bytes >= 9 then
@@ -1600,6 +1933,9 @@ function LaunchpadProMK3.OnLoad()
 	adjustSend = 1
 	tempoMode = false
 	swingMode = false
+	qlinkMode = false
+	qlinkPage = 0
+	qlinkCol = 0
 	clipOp = nil
 	clipOrigin = nil
 	aperture = dev.clipMatrixAperture or (mpc.clipMatrix and mpc.clipMatrix.clipMatrixAperture)
@@ -1683,6 +2019,15 @@ function LaunchpadProMK3.OnLoad()
 	queryLayout()
 	layoutQuerySent = true
 
+	-- device inquiry (universal sysex F0 7E 7F 06 01 F7): ask the LPP3 for its
+	-- firmware version; log-only, the reply is parsed in HandleMIDISysex
+	local okProbe = pcall(function()
+		dev.midiOut.SendMIDISysex(string.char(0x7E, 0x7F, 0x06, 0x01), port)
+	end)
+	if not okProbe then
+		logOnce("fwprobe", "firmware probe failed")
+	end
+
 	listenAll()
 	paintAll()
 	call(dev.timer and dev.timer.Start, 50)
@@ -1696,11 +2041,21 @@ function LaunchpadProMK3.OnUnload()
 	adjustSend = 1
 	tempoMode = false
 	swingMode = false
+	qlinkMode = false
+	qlinkPage = 0
+	qlinkCol = 0
 	clipOp = nil
 	clipOrigin = nil
 	if programmerEntered then
 		sendLayout(priorLayout or 0x04, priorPage or 0x00)
 		log("restored layout")
+	end
+	if nativeTap then
+		-- Shift was held: hand CC 6 back so the removal below unregisters the
+		-- routing OnLoad registered
+		local cs = dev.mappings and dev.mappings.controlSurface
+		call(cs and cs.RemoveCCToControl, 0, LEFT.sends)
+		nativeTap = false
 	end
 	local m = dev.mappings and dev.mappings.script
 	if m then

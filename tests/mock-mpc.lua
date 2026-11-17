@@ -170,6 +170,41 @@ local commandManager = {
 	end,
 }
 
+-- Q-Links (mpc.controlSurface.qlinks, 0-based, 16 knobs); SetPosition writes the position,
+-- Twist moves it by a delta (clamped 0-127), Touch records a touch.
+local qlinkPositions = {}
+local qlinks = {}
+for i = 0, 15 do
+	qlinks[i] = {
+		GetPosition = function()
+			return qlinkPositions[i] or 0
+		end,
+		SetPosition = function(pos)
+			qlinkPositions[i] = pos
+			record("SetPosition", i, pos)
+		end,
+		Twist = function(delta)
+			qlinkPositions[i] = math.max(0, math.min(127, (qlinkPositions[i] or 0) + delta))
+			record("Twist", i, delta)
+		end,
+		Touch = function()
+			record("Touch", i)
+		end,
+		GetValue = function()
+			return (qlinkPositions[i] or 0) / 127
+		end,
+		GetValueString = function()
+			return tostring(qlinkPositions[i] or 0)
+		end,
+		GetTargetName = function()
+			return "target" .. i
+		end,
+	}
+end
+qlinks.GetNumQLinks = function()
+	return 16
+end
+
 -- virtual Force buttons (mpc.force.<name>.Press/Release)
 local force = {}
 for _, name in ipairs({ "copy", "delete" }) do
@@ -349,6 +384,7 @@ local mpc = {
 	force = force,
 	controlSurface = {
 		pads = { Tap = function() end, Press = function() end, Release = function() end },
+		qlinks = qlinks,
 		quantizeApply = {
 			Press = function()
 				record("quantizeApply.Press")
@@ -385,6 +421,7 @@ end
 M.sequencer = sequencer
 M.commandManager = commandManager
 M.force = force
+M.qlinks = qlinks
 M.midiOut = midiOut
 M.timer = timer
 function M.setNow(n)

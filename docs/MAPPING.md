@@ -18,10 +18,11 @@ upside down.
 
 ## Track row (CC 101-108) + function buttons (CC 1-8)
 
-Hold a function button (CC 1-3, 7-8), then press a track button (CC 101-108) to apply
+Hold a function button (CC 1-3, 8), then press a track button (CC 101-108) to apply
 that function to that track. Without a held function, a track button selects the track.
 Volume, pan and sends (CC 4-6) are menus, not holds: press the button to enter the menu
-and press it again to exit.
+and press it again to exit. Device (CC 7) is not a hold either: it toggles the Q-Link page
+(see below).
 
 | CC | Function | Shift |
 |---|---|---|
@@ -31,7 +32,7 @@ and press it again to exit.
 | 4 | volume menu | — |
 | 5 | pan menu | — |
 | 6 | sends menu | tap again to cycle send 1-4 |
-| 7 | tempo page (Shift) | tempo page: up/down change BPM, hold to accelerate |
+| 7 | Q-Link page | tempo page: up/down change BPM, hold to accelerate |
 | 8 | stop clip | swing page: up/down change swing, hold to accelerate |
 
 Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or hold CC 8
@@ -58,7 +59,7 @@ function is preserved (releasing the shift-function button does not clear it).
 | 4 | — | — |
 | 5 | — | — |
 | 6 | tap tempo (Shift) | averages the last taps using `dev.timer.Now()` ms timestamps and sets integer `sequencer.SetBPM` |
-| 7 | tempo page (Shift) | toggles the tempo page; the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones white, tens orange, hundreds blue; blue/orange/white differ in hue and luminance for colourblind accessibility); up/down change BPM (hold accelerates) |
+| 7 | tempo page (Shift) | Shift + CC 7 toggles the tempo page (unshifted CC 7 opens the Q-Link page instead); the grid draws the BPM left-aligned as scaled 7-segment digits (a leading 1 takes 1 column, the tens and ones digits share the rest; a 2-digit BPM uses 4 columns each), coloured by position (ones white, tens orange, hundreds blue; blue/orange/white differ in hue and luminance for colourblind accessibility); up/down change BPM (hold accelerates) |
 | 8 | swing page (Shift) | toggles the swing page; the grid draws the swing % left-aligned as scaled 7-segment digits (same layout and colourblind-safe colours as the tempo page); up/down change swing by 1 (50-75, hold accelerates) |
 
 Undo/redo/metronome are guarded: a missing `commandManager` or `sequencer` logs once and
@@ -104,6 +105,32 @@ and 75% is the maximum. Up
 then 50 ms). The pads are inert on this page. The swing value is read/written through
 `mpc.sequencer.quantiser.GetSwing()` / `SetSwing(50-75)`; the stop-clip button (CC 8) is
 white while the page is open and the up/down arrows take the swing page colour (yellow).
+
+### Q-Link page (CC 7)
+
+Press device (CC 7) to toggle the Q-Link page. The grid shows the MPC Q-Links
+(`mpc.controlSurface.qlinks`, 16 knobs, 0-based) as cyan bottom-up faders: bank 1 =
+Q-Links 0-7, bank 2 = Q-Links 8-15. Each fader reads `GetPosition()` (0-127) and lights
+`round(pos / 127 * 8)` pads. The page requires `controlSurface.qlinks`; without it the
+button press is logged and ignored.
+
+| Action | Effect |
+|---|---|
+| Grid pad in column `c`, row `r` | Sets Q-Link `qlinkPage * 8 + c` to `floor((8 - r) / 8 * 127 + 0.5)` |
+| Up (CC 80) / down (CC 70) | Switch to bank 2 / bank 1 (logs `qlink bank 2/1`) |
+| Shift + up / down | Nudge the last touched column's Q-Link by ±1 |
+| Device (CC 7) again | Exit |
+
+A pad set calls `Touch()` (if present; errors ignored), then drives `Twist(target -
+GetPosition())` with the delta clamped to ±127, repeated at most twice to absorb the
+`GetPosition` lag, then calls `Touch()` again; the script logs `qlink N = pos (value
+string)`. If a qlink object has no `Twist`, the script falls back to `SetPosition(target)`
+and logs `qlink N = pos (setpos)` — `SetPosition` alone updates the Q-Link's ValueString
+but does not reach the MPC edit-mode value on 3.10.1 (device-verified; see LIMITATIONS).
+The page is mutually exclusive with the fader menus, the tempo page and the swing page.
+The device button is white while the page is open and light grey when
+`controlSurface.qlinks` (or the tempo page's `sequencer.SetBPM`) exists; Shift + CC 7
+stays the tempo page.
 
 ### Quantize (CC 40)
 
@@ -172,9 +199,9 @@ working.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
-- Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected.
+- Function buttons (CC 1-8): three states — off when the function is unavailable, a lighter grey when available, white when held/selected (the device button is white while the Q-Link page or tempo page is open).
 - Top row: current mode white, others dim; Shift white while held.
-- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page or swing page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing). Fixed length is a stub and stays off.
+- Left column: play green while playing, record red while recording; duplicate/clear white while available; quantize white when `controlSurface.quantizeApply` is available; up/down white while available and take the page colour while a fader menu, tempo page, swing page or Q-Link page is open (cyan volume, magenta pan, send colour, white tempo, yellow swing, cyan Q-Link). Fixed length is a stub and stays off.
 - Right column: current mode white, others dim; logo cyan in probe mode.
 
 LEDs are sent as LPP3 sysex `F0 00 20 29 02 0E 03 <spec>... F7` (RGB type 3, 0-127),

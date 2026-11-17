@@ -10,9 +10,8 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends + tap tempo + tempo page + swing page + quantize are implemented
-and host-tested.
-Track device and Q-links are stubbed for later phases.
+track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page are
+implemented and host-tested.
 
 ## What it does
 
@@ -27,8 +26,9 @@ Track device and Q-links are stubbed for later phases.
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo.
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
 - **Function buttons**: CC 1-8 = record arm/mute/solo/volume/pan/sends/device/stop clip.
-  Hold CC 1-3/7-8, then press a track button (CC 101-108) to apply it to that track.
-  Shift + CC 1/2/3/6/7/8 = undo/redo/click/tap/tempo/swing.
+  Hold CC 1-3/8, then press a track button (CC 101-108) to apply it to that track.
+  CC 4-6 open fader menus, CC 7 toggles the Q-Link page. Shift + CC 1/2/3/6/7/8 =
+  undo/redo/click/tap/tempo/swing.
 - **Clip edits**: CC 60 clear (arm, then press the clip pad), CC 50 duplicate (arm, press
   the origin pad, then the target pad); CC 40 quantize applies quantize via
   `controlSurface.quantizeApply`.
@@ -39,6 +39,12 @@ Track device and Q-links are stubbed for later phases.
   grid, up/down + hold to accelerate); Shift + CC 8 = swing page (swing % on the grid,
   50-75 where 50% is straight timing, up/down + hold to accelerate; reads/writes
   `sequencer.quantiser.GetSwing`/`SetSwing`).
+- **Q-Link page**: CC 7 (device) toggles the Q-Link page; the grid shows Q-Links 0-7 as
+  cyan faders (up/down switches to Q-Links 8-15), press a pad to set that Q-Link,
+  Shift+up/down nudges the last touched column by 1; press CC 7 again to exit. Changes go
+  through `controlSurface.qlinks[i]` `Touch()` + `Twist(delta)` — `SetPosition` updates the
+  ValueString but not the edit-mode value, so it is only the missing-`Twist` fallback.
+  Shift + CC 7 remains the tempo page.
 - **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
   clip/step/track modes.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
