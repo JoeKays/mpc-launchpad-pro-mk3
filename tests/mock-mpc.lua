@@ -10,9 +10,11 @@ M.record = record
 local function prop(v)
 	local p = { value = v, listeners = {} }
 	function p:listen(fn, name)
+		record("listen", name)
 		self.listeners[#self.listeners + 1] = fn
 	end
 	function p:stopListening(name)
+		record("stopListening", name)
 		self.listeners = {}
 	end
 	function p:set(v)
@@ -234,6 +236,7 @@ end
 
 local originCol = 0
 local originRow = 0
+local activeMatrix = "Normal"
 local aperture = {
 	SetColumns = function(n)
 		record("SetColumns", n)
@@ -283,6 +286,16 @@ local aperture = {
 	MoveDown = function(n)
 		originRow = originRow + n
 		record("MoveDown", n)
+	end,
+	-- follow current track: SetActiveMatrix picks the matrix, MoveToColumn takes
+	-- a window-local track column
+	SetActiveMatrix = function(m)
+		activeMatrix = m
+		record("SetActiveMatrix", m)
+	end,
+	MoveToColumn = function(n)
+		originCol = n
+		record("MoveToColumn", n)
 	end,
 	ToGlobalColumn = function(c)
 		return c + originCol
@@ -413,6 +426,9 @@ local dev = {
 M.mpc = mpc
 M.dev = dev
 M.aperture = aperture
+function M.getActiveMatrix()
+	return activeMatrix
+end
 M.clipProperties = clipProperties
 M.tracks = tracks
 function M.setNormalTrackCount(n)

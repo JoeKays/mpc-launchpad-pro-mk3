@@ -33,6 +33,8 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 | **Quantize** | CC 40 applies quantize via `mpc.controlSurface.quantizeApply.Press()`/`Release()`; the quantize button is white when the control exists. The quantize settings live on `mpc.sequencer.quantiser` (`SetEnabled`, `SetStrength`, `SetTimeDivision`, `SetWindow`, `SetShift`, `SetSwing`). |
 | **Duplicate/clear** | Implemented via `mpc.clipMatrix.CopyClip`/`DeleteClip`: hold CC 50/60, then press the origin/target or clip pads. The op is active only while the button is held; duplicate keeps the origin so one source can be copied to many targets. If the API is missing the script logs the attempted call and does nothing. |
 | **`mpc.clipMatrix.CopyClip`/`DeleteClip`** | Present in the 3.10.1 binary; confirm on hardware. |
+| **Clip state colours / blink** | With `clipProperties` the grid shows live states (empty dark, selected empty dim white, stopped = clip colour solid, playing/queued green, recording red). The MPK's hardware fast/slow blink channels are rendered as 2 Hz / 1 Hz repaints alternating full colour with dim — the RGB sysex used has no blink channel. Selection shows on empty slots only (single-pad ring substitute). |
+| **Follow current track** | The grid follows `mpc.tracks.currentTrack.Index` (`SetActiveMatrix` Normal/Master + `aperture.MoveToColumn`) and rebinds its slot listeners on every window move (manual scrolling included). Guarded: without `SetActiveMatrix`/`MoveToColumn` the follow degrades to manual scrolling only. |
 | **Track volume/pan/sends** | Implemented as menus: press CC 4/5/6, press a grid pad to set a track's value, up/down to nudge; tapping CC 6 cycles sends. Volume writes `VolumeDB` (dB) with a `Volume` fallback; sends 1-4 use different colours. |
 | **Stop clip** | Hold CC 8 + a track button (CC 101-108) or a clip pad stops that track's clips (`aperture.StopClipsOnTrack`); the clip pad does not launch while stop clip is held. |
 | **Empty tracks** | Fader menus only light tracks below `mpc.tracks.SizeNormalTracks`; empty tracks stay dark. |
@@ -46,7 +48,7 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 ## Degrade behaviour
 
 - Missing aperture → clip surface disabled, transport/track row/function buttons continue.
-- Missing clipProperties → grid dark, clip launch still works via `mpc.clipMatrix`.
+- Missing clipProperties → the grid falls back to timer polling of `mpc.clipMatrix` (stopped/playing/queued granularity, 2 s full resend); slot listeners, live state colours and follow are off; clip launch still works via `mpc.clipMatrix`.
 - Missing sequencer → transport buttons and Shift + CC 3 metronome inert, no crash.
 - Missing commandManager → Shift + CC 1/2 undo/redo inert, no crash.
 - Missing `mpc.clipMatrix.CopyClip`/`DeleteClip` → duplicate/clear log the attempted call, no crash.

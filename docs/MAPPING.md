@@ -16,6 +16,35 @@ upside down.
 | Pad press | `aperture.SelectClip(col, 7-padRow)` then `aperture.TriggerClip(col, 7-padRow)` |
 | Shift + pad | `aperture.SelectClip(col, 7-padRow)` only (no launch) |
 
+### Clip states + follow (live grid)
+
+The grid reads the aperture's live clip properties (`clipProperties[col][row]` ->
+`Colour`/`State`/`Selected`), so the LEDs update immediately through property listeners:
+each slot listens on Colour/State/Selected and any change repaints the whole grid
+(MPK-style full refresh, so blink phases stay in sync). LED semantics:
+
+| Clip State | LED |
+|---|---|
+| < 2 (empty slot) | dark; dim white (60,60,60) when the slot is Selected (ring substitute) |
+| 2 (stopped clip) | the clip's own colour, solid (Colour is an ARGB int, alpha ignored) |
+| 3-5 (playing/queued) | green |
+| >= 6 (recording) | red |
+
+Blinking follows the MPK semantics: transitions (State 3/5/6/8/9/11) blink fast,
+playing/recording/overdubbing (4/7/10) blink slow. The RGB sysex used has no blink
+channel, so blink is rendered by repainting the pad dim on the timer phase: fast = 2 Hz,
+slow = 1 Hz. Without `clipProperties` the grid degrades to polling `mpc.clipMatrix` on
+the timer (dim stopped / bright playing / blink queued).
+
+The grid also follows MPC's current track: a `mpc.tracks.currentTrack.Index` listener
+moves the window to that track — `SetActiveMatrix("Normal")` + `MoveToColumn(index)`, or
+`SetActiveMatrix("Master")` + `MoveToColumn(index - SizeNormalTracks)` for the master
+track — then re-registers the slot listeners for the new window and repaints. The track
+row (CC 101-108) selects MPC's current track, so pressing a track button makes the grid
+follow it. Manual scrolling (91/92 left/right, 80/70 up/down) moves the window freely
+and re-registers the listeners too; the next current-track change snaps the window back
+to that track's column.
+
 ## Track row (CC 101-108) + function buttons (CC 1-8)
 
 Hold a function button (CC 1-3, 8), then press a track button (CC 101-108) to apply
@@ -195,7 +224,7 @@ working.
 
 ## LED feedback
 
-- Grid: clip colour, dim when stopped, bright when playing/recording, blink when queued.
+- Grid: live clip states — empty slots dark (selected = dim white), stopped clips in their own colour (solid), playing/queued green, recording red; transitions blink fast (2 Hz), playing/recording/overdubbing blink slow (1 Hz). Updates arrive through property listeners (192 slot listeners + scene/track/transport + `currentTrack.Index`); the 50 ms timer repaint stays as the fallback/degrade path.
 - Scene buttons: green when the row plays, blink when queued, dim otherwise.
 - Track row (CC 101-108): the held function's state per track (mute = orange, solo = yellow, rec arm = red) or the track colour.
 - Volume/pan/sends menu: every track column is a value bar (cyan volume, magenta pan, one colour per send: yellow/green/blue/orange), filled from the bottom. Columns beyond `SizeNormalTracks` (empty tracks) stay dark.
