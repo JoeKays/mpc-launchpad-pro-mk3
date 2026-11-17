@@ -38,3 +38,10 @@ MPC binary; read it from your own copy, never publish it.
 
 `dev/workflow.js` and `dev/workflow2.js` are the subagent orchestration scripts used to
 build this project. They are gitignored and contain local paths.
+
+
+## Device .ini constraints (MPC 3.10.1)
+
+- `scriptVersion` must be a single-dot `MAJOR.MINOR` value (e.g. `1.2`, like Akai's
+  own scripts). A semver string such as `1.2.0` makes the loader **silently skip the
+  script** — no log line, no load. Device-verified.
