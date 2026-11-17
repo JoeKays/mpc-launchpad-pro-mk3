@@ -10,8 +10,8 @@ scripts as additional patterns.
 ## Status
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
-track volume/pan/sends are implemented and host-tested. Track device and Q-links are
-stubbed for later phases.
+track volume/pan/sends + tap tempo + tempo page are implemented and host-tested.
+Track device and Q-links are stubbed for later phases.
 
 ## What it does
 
