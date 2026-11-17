@@ -104,9 +104,13 @@ local sequencer = {
 	Record = function()
 		record("Record")
 	end,
+	Overdub = function()
+		record("Overdub")
+	end,
 	IsPlaying = function()
 		return false
 	end,
+	Loop = prop(false),
 	Playing = prop(false),
 	RecordState = prop(false),
 	OverdubState = prop(false),
@@ -122,6 +126,7 @@ local sequencer = {
 		return mockBpm
 	end,
 	quantiser = {
+		Enabled = prop(true),
 		GetSwing = function()
 			return mockSwing
 		end,
@@ -360,6 +365,15 @@ local mappings = {
 			end,
 		},
 	},
+	-- MPC-side control routing (e.g. the native Tap Tempo control)
+	controlSurface = {
+		AddCCToControl = function(ch, cc, name)
+			record("AddCCToControl", ch, cc, name)
+		end,
+		RemoveCCToControl = function(ch, cc)
+			record("RemoveCCToControl", ch, cc)
+		end,
+	},
 }
 
 -- midi out
@@ -413,9 +427,28 @@ local timer = {
 local normalTrackCount = 8
 local mpc = {
 	clipMatrix = clipMatrix,
+	project = {
+		AdvanceGlobalAutomationFilterType = function()
+			record("AdvanceGlobalAutomationFilterType")
+		end,
+	},
 	tracks = {
 		normalTracks = tracks,
-		currentTrack = { Index = prop(0) },
+		currentTrack = {
+			Index = prop(0),
+			Previous = function()
+				record("currentTrack.Previous")
+			end,
+			Next = function()
+				record("currentTrack.Next")
+			end,
+			PrevPluginPreset = function()
+				record("currentTrack.PrevPluginPreset")
+			end,
+			NextPluginPreset = function()
+				record("currentTrack.NextPluginPreset")
+			end,
+		},
 		SizeNormalTracks = function()
 			return normalTrackCount
 		end,
