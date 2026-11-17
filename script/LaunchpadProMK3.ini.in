@@ -1,0 +1,9 @@
+[info]
+; Launchpad Pro MK3 controller script for MPC 3.10.1 (Gen2)
+device=Launchpad Pro MK3
+manufacturer=Novation
+input=Launchpad Pro MK3 LPProMK3 MIDI,LPProMK3 MIDI,Launchpad Pro MK3
+output=Launchpad Pro MK3 LPProMK3 MIDI,LPProMK3 MIDI,Launchpad Pro MK3
+script=LaunchpadProMK3.lua
+scriptVersion=1.0
+checksum=

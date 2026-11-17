@@ -1,0 +1,7 @@
+---
+base: lua53
+globals:
+  mpc:
+    any: true
+  LaunchpadProMK3:
+    any: true
