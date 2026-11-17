@@ -5,5 +5,5 @@ manufacturer=Novation
 input=Launchpad Pro MK3 LPProMK3 MIDI,LPProMK3 MIDI,Launchpad Pro MK3
 output=Launchpad Pro MK3 LPProMK3 MIDI,LPProMK3 MIDI,Launchpad Pro MK3
 script=LaunchpadProMK3.lua
-scriptVersion=1.0
+scriptVersion=1.2.0
 checksum=
