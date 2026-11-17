@@ -45,53 +45,55 @@ assert_eq(mock.count("SetPosition"), 0, "no SetPosition on enter")
 assert_eq(mock.count("Twist"), 0, "no Twist on enter")
 assert_eq(mock.leds[7][1], 127, "device button white on qlink page")
 
--- Top pad in column 0: Q-Link 0 -> 127, one Twist(127) from position 0.
+-- Display order (MPC screen, column-major, reversed within each bank):
+-- page 1 = 12,8,4,0,13,9,5,1; page 2 = 14,10,6,2,15,11,7,3.
+-- Top pad in column 1: Q-Link 12 -> 127, one Twist(127) from position 0.
 L.HandleMIDINoteOn(0, 81, 100)
 local c = lastCall("Twist")
-assert_eq(c.args[1], 0, "qlink 0")
-assert_eq(c.args[2], 127, "qlink 0 delta 127")
-assert_eq(mock.qlinks[0]:GetPosition(), 127, "qlink 0 position 127")
-assert_eq(touchesOf(0), 2, "Touch before + after the twist burst")
+assert_eq(c.args[1], 12, "qlink 12 in column 1")
+assert_eq(c.args[2], 127, "qlink 12 delta 127")
+assert_eq(mock.qlinks[12]:GetPosition(), 127, "qlink 12 position 127")
+assert_eq(touchesOf(12), 2, "Touch before + after the twist burst")
 
--- Bottom pad in column 1: column-major order puts Q-Link 4 there -> 16 (1/8 of 127).
+-- Bottom pad in column 2: Q-Link 8 -> 16 (1/8 of 127).
 L.HandleMIDINoteOn(0, 12, 100)
 c = lastCall("Twist")
-assert_eq(c.args[1], 4, "qlink 4 in column 1")
-assert_eq(c.args[2], 16, "qlink 4 delta 16")
-assert_eq(mock.qlinks[4]:GetPosition(), 16, "qlink 4 position 16")
+assert_eq(c.args[1], 8, "qlink 8 in column 2")
+assert_eq(c.args[2], 16, "qlink 8 delta 16")
+assert_eq(mock.qlinks[8]:GetPosition(), 16, "qlink 8 position 16")
 
--- Up arrow switches to page 2 (display order slots 9-16: Q-Links 2,6,10,14,...); down goes back.
+-- Up arrow switches to page 2 (first slot there is Q-Link 14); down goes back.
 L.HandleMIDICC(0, 80, 127)
 L.HandleMIDINoteOn(0, 81, 100)
 c = lastCall("Twist")
-assert_eq(c.args[1], 2, "qlink 2 on page 2")
-assert_eq(c.args[2], 127, "qlink 2 delta 127")
-assert_eq(mock.qlinks[2]:GetPosition(), 127, "qlink 2 position 127")
+assert_eq(c.args[1], 14, "qlink 14 on page 2")
+assert_eq(c.args[2], 127, "qlink 14 delta 127")
+assert_eq(mock.qlinks[14]:GetPosition(), 127, "qlink 14 position 127")
 L.HandleMIDICC(0, 70, 127)
 L.HandleMIDICC(0, 80, 127)
 
--- Shift+down nudges qlink 2 (last touched column) by -1; Shift+up nudges +1, no wrap past 127.
+-- Shift+down nudges qlink 14 (last touched column) by -1; Shift+up nudges +1, no wrap past 127.
 L.HandleMIDICC(0, 90, 127) -- shift on
 L.HandleMIDICC(0, 70, 127) -- shift+down
 c = lastCall("Twist")
-assert_eq(c.args[1], 2, "qlink 2 nudge target")
+assert_eq(c.args[1], 14, "qlink 14 nudge target")
 assert_eq(c.args[2], -1, "nudge -1")
-assert_eq(mock.qlinks[2]:GetPosition(), 126, "qlink 2 = 126")
+assert_eq(mock.qlinks[14]:GetPosition(), 126, "qlink 14 = 126")
 L.HandleMIDICC(0, 80, 127) -- shift+up
-assert_eq(mock.qlinks[2]:GetPosition(), 127, "qlink 2 back to 127")
+assert_eq(mock.qlinks[14]:GetPosition(), 127, "qlink 14 back to 127")
 L.HandleMIDICC(0, 80, 127) -- shift+up at 127 is skipped
-assert_eq(mock.qlinks[2]:GetPosition(), 127, "no wrap past 127")
+assert_eq(mock.qlinks[14]:GetPosition(), 127, "no wrap past 127")
 L.HandleMIDICC(0, 90, 0) -- shift off
 
 -- Fallback: a qlink without Twist is driven with SetPosition.
 L.HandleMIDICC(0, 70, 127) -- back to page 1
-local savedTwist = mock.qlinks[4].Twist
-mock.qlinks[4].Twist = nil
-L.HandleMIDINoteOn(0, 12, 100) -- column 2 = qlink 4
+local savedTwist = mock.qlinks[8].Twist
+mock.qlinks[8].Twist = nil
+L.HandleMIDINoteOn(0, 12, 100) -- column 2 = qlink 8
 c = lastCall("SetPosition")
-assert_eq(c.args[1], 4, "fallback qlink 4")
+assert_eq(c.args[1], 8, "fallback qlink 8")
 assert_eq(c.args[2], 16, "fallback position 16")
-mock.qlinks[4].Twist = savedTwist
+mock.qlinks[8].Twist = savedTwist
 
 -- Shift+CC 7 opens the tempo page and closes the Q-Link page (mutual exclusion):
 -- a pad press must neither launch a clip nor touch a qlink.
@@ -105,12 +107,13 @@ assert_eq(mock.count("Twist"), twistCount, "no twist on tempo page")
 assert_eq(mock.count("TriggerClip"), clipCount, "no clip launch on tempo page")
 
 -- CC 7 re-enters the Q-Link page (and closes the tempo page); pads drive qlinks again.
+-- Note 21 = column 0, second pad from the bottom -> 32; column 0 = Q-Link 12 here.
 L.HandleMIDICC(0, 7, 127)
 L.HandleMIDINoteOn(0, 21, 100)
 c = lastCall("Twist")
-assert_eq(c.args[1], 0, "qlink 0 after re-enter")
-assert_eq(c.args[2], -95, "qlink 0 delta to 32")
-assert_eq(mock.qlinks[0]:GetPosition(), 32, "qlink 0 = 32")
+assert_eq(c.args[1], 12, "qlink 12 after re-enter")
+assert_eq(c.args[2], -95, "qlink 12 delta to 32")
+assert_eq(mock.qlinks[12]:GetPosition(), 32, "qlink 12 = 32")
 
 -- Press CC 7 twice to exit (page 2 first); a pad now launches a clip, button available.
 L.HandleMIDICC(0, 7, 127)
@@ -139,20 +142,21 @@ L.HandleMIDICC(0, 7, 127) -- enter: page 1 (paints the current positions)
 -- column-major order of {0,3,5,9} is 0, 5, 9, 3
 assert_eq(
 	lastLog(),
-	"LaunchpadProMK3: qlink page (4 assigned): 1=Kill EQ Low, 2=Kill EQ Mid, 3=Beat Repeat Delay, 4=Beat Repeat",
-	"page-open map log (column-major order)"
+	"LaunchpadProMK3: qlink page (4 assigned): 1=Kill EQ Low, 2=Beat Repeat Delay, 3=Kill EQ Mid, 4=Beat Repeat",
+	"page-open map log (column-major, reversed within bank)"
 )
+-- order of {0,3,5,9}: 0, 9, 5, 3
 assert_eq(mock.leds[11][2], 127, "column 1 = qlink 0 cyan")
-assert_eq(mock.leds[12][1], 127, "column 2 = qlink 5 magenta r")
-assert_eq(mock.leds[12][2], 0, "column 2 = qlink 5 magenta g")
-assert_eq(mock.leds[13][1], 12, "column 3 = qlink 9 dim at position 0")
+assert_eq(mock.leds[12][1], 12, "column 2 = qlink 9 dim at position 0")
+assert_eq(mock.leds[13][1], 127, "column 3 = qlink 5 magenta r")
+assert_eq(mock.leds[13][2], 0, "column 3 = qlink 5 magenta g")
 assert_eq(mock.leds[14][2], 127, "column 4 = qlink 3 cyan g")
 assert_eq(mock.leds[15] and mock.leds[15][2] or 0, 0, "column 5 dark (only 4 assigned)")
 assert_eq(mock.leds[18] and mock.leds[18][2] or 0, 0, "column 8 dark")
-L.HandleMIDINoteOn(0, 82, 100) -- column 2 top pad drives qlink 5 to 127
-assert_eq(mock.qlinks[5]:GetPosition(), 127, "compacted column 2 drives qlink 5")
-L.HandleMIDINoteOn(0, 13, 100) -- column 3 bottom pad drives qlink 9 to 16
-assert_eq(mock.qlinks[9]:GetPosition(), 16, "compacted column 3 drives qlink 9")
+L.HandleMIDINoteOn(0, 82, 100) -- column 2 top pad drives qlink 9 to 127
+assert_eq(mock.qlinks[9]:GetPosition(), 127, "compacted column 2 drives qlink 9")
+L.HandleMIDINoteOn(0, 13, 100) -- column 3 bottom pad drives qlink 5 to 16
+assert_eq(mock.qlinks[5]:GetPosition(), 16, "compacted column 3 drives qlink 5")
 L.HandleMIDINoteOn(0, 18, 100) -- column 7 has no qlink: inert
 L.HandleMIDICC(0, 7, 127) -- <= 8 assigned: Device tap exits directly
 assert_eq(lastLog(), "LaunchpadProMK3: qlink page off", "device tap exits when page 2 would be empty")
@@ -173,26 +177,26 @@ mock.reset()
 -- Re-enter page 1 for colour + flip tests.
 L.HandleMIDICC(0, 7, 127)
 mock.reset()
--- bank colours on page 1 (column-major): column 1 = Q-Link 0 (cyan), column 2 = Q-Link 4 (magenta)
-local pos0 = mock.qlinks[0]:GetPosition()
-local pos4 = mock.qlinks[4]:GetPosition()
-mock.qlinks[0].SetPosition(127)
-mock.qlinks[4].SetPosition(127)
+-- bank colours on page 1: column 1 = Q-Link 12 (blue), column 2 = Q-Link 8 (yellow)
+local pos12 = mock.qlinks[12]:GetPosition()
+local pos8 = mock.qlinks[8]:GetPosition()
+mock.qlinks[12].SetPosition(127)
+mock.qlinks[8].SetPosition(127)
 L.HandleMIDICC(0, 7, 127) -- -> page 2
 L.HandleMIDICC(0, 7, 127) -- -> exit
 L.HandleMIDICC(0, 7, 127) -- -> page 1 again (fresh paint)
-assert_eq(mock.leds[81][2], 127, "qlink 0 top pad cyan g")
-assert_eq(mock.leds[81][1], 0, "qlink 0 top pad cyan r")
-assert_eq(mock.leds[82][1], 127, "qlink 4 top pad magenta r")
-assert_eq(mock.leds[82][2], 0, "qlink 4 top pad magenta g")
-mock.qlinks[0].SetPosition(pos0 or 0)
-mock.qlinks[4].SetPosition(pos4 or 0)
+assert_eq(mock.leds[81][3], 127, "qlink 12 top pad blue b")
+assert_eq(mock.leds[81][1], 0, "qlink 12 top pad blue r")
+assert_eq(mock.leds[82][1], 127, "qlink 8 top pad yellow r")
+assert_eq(mock.leds[82][2], 127, "qlink 8 top pad yellow g")
+mock.qlinks[12].SetPosition(pos12 or 0)
+mock.qlinks[8].SetPosition(pos8 or 0)
 
 -- Flip parameters: two value strings across a wide span -> presses round to extremes,
 -- and the column shows a single lit extreme pad.
 mock.setQlinkBinary(0)
-L.HandleMIDINoteOn(0, 81, 100) -- column 1 = qlink 0 top pad -> 127 ("Kill")
-L.HandleMIDINoteOn(0, 11, 100) -- column 1 = qlink 0 bottom pad -> 16 ("Thru")
+L.HandleMIDINoteOn(0, 84, 100) -- column 4 = qlink 0 top pad -> 127 ("Kill")
+L.HandleMIDINoteOn(0, 14, 100) -- column 4 = qlink 0 bottom pad -> 16 ("Thru")
 local flipLogged = false
 for _, l in ipairs(logs) do
 	if l == "LaunchpadProMK3: qlink 0 flip parameter" then
@@ -200,14 +204,14 @@ for _, l in ipairs(logs) do
 	end
 end
 assert_eq(flipLogged and true or false, true, "flip parameter learned")
-L.HandleMIDINoteOn(0, 41, 100) -- column 1 middle pad, bottom half -> rounds to 0
+L.HandleMIDINoteOn(0, 44, 100) -- column 4 middle pad, bottom half -> rounds to 0
 assert_eq(mock.qlinks[0]:GetPosition(), 0, "flip press rounds to the min extreme")
-L.HandleMIDINoteOn(0, 51, 100) -- column 1 middle pad, top half -> rounds to 127
+L.HandleMIDINoteOn(0, 54, 100) -- column 4 middle pad, top half -> rounds to 127
 assert_eq(mock.qlinks[0]:GetPosition(), 127, "flip press rounds to the max extreme")
 -- display at the max extreme: only the top pad is lit (cyan = bank colour of qlink 2)
-assert_eq(mock.leds[81][1], 0, "flip max extreme pad lit (cyan r=0)")
-assert_eq(mock.leds[81][2], 127, "flip max extreme pad lit (cyan g)")
-assert_eq(mock.leds[11][1], 12, "flip: bottom pad dim when at max")
+assert_eq(mock.leds[84][1], 0, "flip max extreme pad lit (cyan r=0)")
+assert_eq(mock.leds[84][2], 127, "flip max extreme pad lit (cyan g)")
+assert_eq(mock.leds[14][1], 12, "flip: bottom pad dim when at max")
 
 _G.print = realPrint
 print("test-qlink: PASS")

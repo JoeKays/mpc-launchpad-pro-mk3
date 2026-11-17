@@ -745,12 +745,13 @@ end
 
 -- Columns show only the ASSIGNED Q-Links, compacted left-to-right with no gaps
 -- (unassigned slots would leave dark columns in between). The order follows the
--- MPC's Q-Link screen, which lists the 16 slots column-major: its page 1 is Q-Links
--- 0,4,8,12, page 2 is 1,5,9,13, page 3 is 2,6,10,14, page 4 is 3,7,11,15. Raw index
--- order interleaves the MPC's pages (device-verified: a user's Kill EQ page lived at
--- 0,4,8,12 and the Beat Repeat page at 1,5,9,13). Page 1 of the Launchpad grid shows
+-- MPC's Q-Link screen, which lists the 16 slots column-major with each bank/page
+-- running in reverse index order: its page 1 is Q-Links 12,8,4,0, page 2 is 13,9,5,1,
+-- page 3 is 14,10,6,2, page 4 is 15,11,7,3 (device-verified twice over: the Kill EQ
+-- page lives at 0,4,8,12 and the Beat Repeat page at 1,5,9,13, each reading newest
+-- slot first on the screen). Page 1 of the Launchpad grid shows
 -- the first 8 assigned Q-Links in this order, page 2 the rest.
-local QLINK_DISPLAY_ORDER = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 }
+local QLINK_DISPLAY_ORDER = { 12, 8, 4, 0, 13, 9, 5, 1, 14, 10, 6, 2, 15, 11, 7, 3 }
 local qlinkColumnMap = {}
 
 local function buildQlinkColumnMap()

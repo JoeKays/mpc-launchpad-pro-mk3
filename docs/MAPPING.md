@@ -166,8 +166,9 @@ All 16 Q-Links are reachable, **compacted**: only the assigned Q-Links (non-empt
 target name) get columns, packed left-to-right with no dark gaps between faders; the
 page-open log line lists the map (`qlink page (N assigned): 1=name, 2=name, ...`).
 The column order follows the MPC's Q-Link screen, which lists the 16 slots
-**column-major** (its page 1 = Q-Links 0,4,8,12; page 2 = 1,5,9,13; page 3 =
-2,6,10,14; page 4 = 3,7,11,15) — raw index order would interleave the MPC's pages.
+**column-major with each bank reversed** (its page 1 = Q-Links 12,8,4,0; page 2 =
+13,9,5,1; page 3 = 14,10,6,2; page 4 = 15,11,7,3) — raw index order would interleave
+and reverse the MPC's pages.
 Launchpad page 1 = the first 8 assigned Q-Links in that order, page 2 = the rest;
 tapping Device cycles page 1 -> page 2 -> exit (page 2 is skipped when 8 or fewer
 are assigned).
