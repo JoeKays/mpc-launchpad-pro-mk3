@@ -155,7 +155,6 @@ local qlinkMode = false -- CC7 device page: Q-Link faders (Twist-driven)
 local qlinkPage = 0 -- 0 = Q-Links 0-7, 1 = Q-Links 8-15
 local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
-local muteMode = false -- CC96 track mute mode: grid rows mute tracks 0-15
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
@@ -290,11 +289,6 @@ local function padsModeAvailable()
 		and m.pads ~= nil
 		and mpc.controlSurface ~= nil
 		and mpc.controlSurface.pads ~= nil
-end
-
-local function muteModeAvailable()
-	local m = dev.mappings
-	return m ~= nil and m.script ~= nil and m.tracks ~= nil and m.tracks.mutes ~= nil
 end
 
 local function argb(c)
@@ -642,28 +636,57 @@ end
 
 -- Drive qlink i to pos: Twist(target - GetPosition()), clamped to +-127, repeated at most
 -- twice to absorb the GetPosition lag; falls back to SetPosition when Twist is missing.
+local qlinkTargetLogged = {} -- page-open diagnosis: one line per qlink
+
+local function qlinkTargetName(i)
+	local q = qlinkAt(i)
+	local name = call(q and q.GetTargetName)
+	if type(name) ~= "string" then
+		name = propValue(q, "TargetName")
+	end
+	return type(name) == "string" and name or ""
+end
+
+-- Drive qlink i to pos. Twist is primary (a real knob rotation); SetValue (the target's
+-- un-normalised value) is the second attempt when Twist does not move the target;
+-- SetPosition only syncs the knob position display and is the last resort.
 local function setQlinkPosition(i, pos)
 	local q = qlinkAt(i)
 	if not q then
 		return
 	end
-	if type(q.Twist) ~= "function" then
-		call(q.SetPosition, pos)
-		log(string.format("qlink %d = %d (setpos)", i, pos))
-		return
+	if not qlinkTargetLogged[i] then
+		qlinkTargetLogged[i] = true
+		log(string.format("qlink %d target '%s'", i, qlinkTargetName(i)))
 	end
+	local before = call(q.GetValueString)
+	local posBefore = call(q.GetPosition) or 0
 	touchQlink(q)
-	for _ = 1, 2 do
-		local delta = pos - (call(q.GetPosition) or 0)
-		if delta == 0 then
-			break
+	if type(q.Twist) == "function" then
+		for _ = 1, 2 do
+			local delta = pos - (call(q.GetPosition) or 0)
+			if delta == 0 then
+				break
+			end
+			if delta > 127 then
+				delta = 127
+			elseif delta < -127 then
+				delta = -127
+			end
+			call(q.Twist, delta)
 		end
-		if delta > 127 then
-			delta = 127
-		elseif delta < -127 then
-			delta = -127
+	end
+	local afterTwist = call(q.GetValueString)
+	if afterTwist == before and type(q.SetValue) == "function" then
+		-- Twist did not change the target value: try the target value directly.
+		-- GetValue() is the current un-normalised value; scale by the position change.
+		local v = call(q.GetValue)
+		if type(v) == "number" and posBefore ~= 0 then
+			call(q.SetValue, v * pos / posBefore)
 		end
-		call(q.Twist, delta)
+		call(q.SetPosition, pos)
+	elseif type(q.SetPosition) == "function" then
+		call(q.SetPosition, pos) -- keep the knob position in sync with the target
 	end
 	touchQlink(q)
 	log(string.format("qlink %d = %d (%s)", i, pos, tostring(call(q.GetValueString) or "")))
@@ -725,6 +748,7 @@ local function enterQlink()
 	qlinkMode = true
 	qlinkPage = 0
 	qlinkCol = 0
+	qlinkTargetLogged = {}
 	log("qlink page")
 	paintAll()
 end
@@ -803,7 +827,11 @@ local function paintPadsGrid(poll)
 	for i = 0, 15 do
 		local idx = 10 * (math.floor(i / 4) + 1) + (i % 4) + 1
 		if poll then
-			local v = propValue(pads and pads[i], "Colour")
+			local p = pads and pads[i]
+			local v = call(p and p.GetColour)
+			if type(v) ~= "number" then
+				v = propValue(p, "Colour")
+			end
 			if v ~= padsColourCache[i] then
 				padsColourCache[i] = v
 				local r, g, b = argb(v)
@@ -816,51 +844,10 @@ local function paintPadsGrid(poll)
 	end
 end
 
--- Mute mode grid: the bottom two rows show tracks 0-15 (track colour when unmuted, dim
--- grey when muted); tracks beyond SizeNormalTracks stay dark.
-local function paintMuteGrid()
-	local trackCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
-	local bottom = {}
-	for i = 0, 15 do
-		bottom[10 * (math.floor(i / 8) + 1) + (i % 8) + 1] = true
-	end
-	-- the rows above the mute block stay dark; the mute pads are painted below
-	for row = 0, GRID_ROWS - 1 do
-		for col = 0, GRID_COLS - 1 do
-			local idx = 10 * (8 - row) + col + 1
-			if not bottom[idx] then
-				ledOff(idx)
-			end
-		end
-	end
-	for i = 0, 15 do
-		local idx = 10 * (math.floor(i / 8) + 1) + (i % 8) + 1
-		local t = trackAt(i)
-		if t and i < trackCount then
-			if propValue(t, "Mute") then
-				ledRGB(idx, 15, 15, 15) -- muted: dim grey
-			else
-				local c = propValue(t, "Colour")
-				local r, g, b = 0, 0, 0
-				if type(c) == "number" then
-					r, g, b = argb(c)
-				end
-				ledRGB(idx, scale7(r), scale7(g), scale7(b))
-			end
-		else
-			ledOff(idx) -- tracks beyond SizeNormalTracks stay dark
-		end
-	end
-end
-
 local function paintGrid()
 	if padsMode then
 		-- mirror refresh every 2 ticks (100 ms); between refreshes repaint from the cache
 		paintPadsGrid(ticks % 2 == 0)
-		return
-	end
-	if muteMode then
-		paintMuteGrid()
 		return
 	end
 	if tempoMode then
@@ -1014,7 +1001,7 @@ local function paintTop()
 	local sequencer = modeColour("step")
 	local note = padsMode and C.white or (padsModeAvailable() and C.available or C.off)
 	local chord = modeColour("chord")
-	local custom = muteMode and C.white or (muteModeAvailable() and C.available or C.off)
+	local custom = C.off -- stub (mutes live on the CC 2 hold-function)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
 	ledRGB(TOP.note, note[1], note[2], note[3])
@@ -1036,14 +1023,23 @@ local function paintLeft()
 	local playing = sq and call(sq.IsPlaying) or propValue(sq, "Playing")
 	local recording = propValue(sq, "RecordState")
 	local overdub = propValue(sq, "OverdubState")
-	local rec = recording or overdub
-	ledRGB(
-		LEFT.play,
-		playing and C.green[1] or C.dim[1],
-		playing and C.green[2] or C.dim[2],
-		playing and C.green[3] or C.dim[3]
-	)
-	ledRGB(LEFT.record, rec and C.red[1] or C.dim[1], rec and C.red[2] or C.dim[2], rec and C.red[3] or C.dim[3])
+	local loop = propValue(sq, "Loop")
+	-- play: green while playing, orange while loop is enabled, dim otherwise
+	if playing then
+		ledRGB(LEFT.play, C.green[1], C.green[2], C.green[3])
+	elseif loop then
+		ledRGB(LEFT.play, C.orange[1], C.orange[2], C.orange[3])
+	else
+		ledRGB(LEFT.play, C.dim[1], C.dim[2], C.dim[3])
+	end
+	-- record: red while recording, orange while overdubbing, dim otherwise
+	if recording then
+		ledRGB(LEFT.record, C.red[1], C.red[2], C.red[3])
+	elseif overdub then
+		ledRGB(LEFT.record, C.orange[1], C.orange[2], C.orange[3])
+	else
+		ledRGB(LEFT.record, C.dim[1], C.dim[2], C.dim[3])
+	end
 	ledOff(LEFT.fixedLength)
 	local quantizeAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.quantizeApply ~= nil
 	ledRGB(
@@ -1159,8 +1155,10 @@ end
 -- (Master matrix for the master track), then rebind the slot listeners for the
 -- new window and repaint. The track row (CC 101-108) selects MPC's current
 -- track, so the grid follows track selection too.
+local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
+
 local function followCurrentTrack(index)
-	if aperture and type(index) == "number" then
+	if followMode and aperture and type(index) == "number" then
 		local normalCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
 		if index >= normalCount then
 			call(aperture.SetActiveMatrix, "Master")
@@ -1215,6 +1213,7 @@ local function listenAll()
 		listen(sq.Playing, repaint)
 		listen(sq.RecordState, repaint)
 		listen(sq.OverdubState, repaint)
+		listen(sq.Loop, repaint)
 	end
 	local ct = mpc.tracks and mpc.tracks.currentTrack
 	if ct then
@@ -1262,11 +1261,6 @@ local function padsModeNote(i)
 	return 10 * (math.floor(i / 4) + 1) + (i % 4) + 1
 end
 
--- Grid note of a mute-mode pad: trackIndex 0-15 -> the bottom two rows.
-local function muteModeNote(i)
-	return 10 * (math.floor(i / 8) + 1) + (i % 8) + 1
-end
-
 -- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
 local function exitPadsMode()
 	if not padsMode then
@@ -1282,27 +1276,6 @@ local function exitPadsMode()
 	end
 	padsColourCache = {}
 	log("pads mode off")
-end
-
--- Exit mute mode: hand the 16 notes back to the script (the caller repaints the clip grid).
-local function exitMuteMode()
-	if not muteMode then
-		return
-	end
-	muteMode = false
-	local m = dev.mappings and dev.mappings.script
-	local mutes = dev.mappings and dev.mappings.tracks and dev.mappings.tracks.mutes
-	for i = 0, 15 do
-		local note = muteModeNote(i)
-		call(mutes and mutes.RemoveNoteToTrackMute, 0, note, i)
-		call(m and m.AddNoteToScript, 0, note)
-	end
-	log("mute mode off")
-end
-
-local function exitPadModes()
-	exitPadsMode()
-	exitMuteMode()
 end
 
 -- Enter pads mode: route the 16 quadrant notes to the MPC pads (hardware-routed; they no
@@ -1324,29 +1297,12 @@ local function enterPadsMode()
 	log("pads mode on")
 end
 
--- Enter mute mode: route the 16 bottom-row notes to the track mutes.
-local function enterMuteMode()
-	local m = dev.mappings and dev.mappings.script
-	local mutes = dev.mappings and dev.mappings.tracks and dev.mappings.tracks.mutes
-	if not (m and mutes and m.RemoveNoteToScript and mutes.AddNoteToTrackMute) then
-		logOnce("mutemode", "mute mode unavailable: mappings.tracks.mutes missing")
-		return
-	end
-	muteMode = true
-	for i = 0, 15 do
-		local note = muteModeNote(i)
-		call(m.RemoveNoteToScript, 0, note)
-		call(mutes.AddNoteToTrackMute, 0, note, i)
-	end
-	log("mute mode on")
-end
-
 local function togglePadsMode()
 	if padsMode then
 		exitPadsMode()
 		return
 	end
-	exitPadModes()
+	exitPadsMode()
 	closeGridStates()
 	enterPadsMode()
 	if padsMode then
@@ -1354,18 +1310,8 @@ local function togglePadsMode()
 	end
 end
 
-local function toggleMuteMode()
-	if muteMode then
-		exitMuteMode()
-		return
-	end
-	exitPadModes()
-	closeGridStates()
-	enterMuteMode()
-end
-
 local function setMode(m)
-	exitPadModes() -- another mode (CC 93 session, CC 97, ...) always returns to the clip grid
+	exitPadsMode() -- another mode (CC 93 session, CC 97, ...) always returns to the clip grid
 	mode = m
 	log("mode -> " .. m)
 	paintAll()
@@ -1551,7 +1497,7 @@ local function nudgeAdjust(delta)
 end
 
 local function enterAdjust(newMode)
-	exitPadModes() -- the fader menus need the whole grid
+	exitPadsMode() -- the fader menus need the whole grid
 	tempoMode = false
 	swingMode = false
 	qlinkMode = false
@@ -1713,7 +1659,7 @@ local function doShiftFunction(fn)
 			doTapTempo()
 		end
 	elseif fn == "device" then
-		exitPadModes() -- the tempo page needs the whole grid
+		exitPadsMode() -- the tempo page needs the whole grid
 		adjustMode = nil
 		swingMode = false
 		qlinkMode = false
@@ -1727,7 +1673,7 @@ local function doShiftFunction(fn)
 		paintAll()
 		flushLEDs()
 	elseif fn == "stopClip" then
-		exitPadModes() -- the swing page needs the whole grid
+		exitPadsMode() -- the swing page needs the whole grid
 		adjustMode = nil
 		tempoMode = false
 		qlinkMode = false
@@ -1794,25 +1740,6 @@ local function doOverdub()
 	end
 	call(sq.Overdub)
 	log("overdub")
-end
-
--- Shift + quantize (CC 40): quantiser on/off (Enabled is userdata with .value).
-local function doQuantiserToggle()
-	local sq = mpc.sequencer
-	local q = sq and sq.quantiser
-	local enabled = propValue(q, "Enabled")
-	if not q or q.Enabled == nil then
-		logOnce("quantiser", "quantiser unavailable: sequencer.quantiser.Enabled missing")
-		return
-	end
-	local ok = pcall(function()
-		q.Enabled.value = not enabled
-	end)
-	if not ok then
-		logOnce("quantiserwrite", "quantiser unavailable: Enabled.value not writable")
-		return
-	end
-	log("quantiser: " .. (enabled and "off" or "on"))
 end
 
 -- Shift + fixed length (CC 30): cycle the global automation filter type.
@@ -1902,7 +1829,7 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	end
 	local col, row = noteIndex(note)
 	if col then
-		if padsMode or muteMode then
+		if padsMode then
 			return -- a pad mode owns the grid; the unbound pads stay inert
 		end
 		if velocity > 0 then
@@ -2000,6 +1927,14 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.session then
+		if shift then
+			followMode = not followMode
+			log("follow: " .. (followMode and "on" or "off"))
+			if followMode then
+				followCurrentTrack(propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
+			end
+			return
+		end
 		setMode("clip")
 		return
 	end
@@ -2021,8 +1956,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.custom then
-		toggleMuteMode()
-		paintAll()
+		logOnce("custom", "custom mode: TODO (mutes live on the CC 2 hold-function)")
 		return
 	end
 	for row = 0, 7 do
@@ -2106,11 +2040,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == LEFT.quantize then
-		if shift then
-			doQuantiserToggle()
-		else
-			doQuantize()
-		end
+		doQuantize()
 		return
 	end
 	if cc == LEFT.duplicate then
@@ -2282,8 +2212,8 @@ function LaunchpadProMK3.OnLoad()
 	qlinkMode = false
 	qlinkPage = 0
 	qlinkCol = 0
+	followMode = false
 	padsMode = false
-	muteMode = false
 	padsColourCache = {}
 	clipOp = nil
 	clipOrigin = nil
@@ -2386,9 +2316,8 @@ end
 function LaunchpadProMK3.OnUnload()
 	call(dev.timer and dev.timer.Stop)
 	removeListeners()
-	exitPadModes() -- hand the pad-mode notes back to the script before unmapping
+	exitPadsMode() -- hand the pad-mode notes back to the script before unmapping
 	padsMode = false
-	muteMode = false
 	padsColourCache = {}
 	adjustMode = nil
 	adjustSend = 1

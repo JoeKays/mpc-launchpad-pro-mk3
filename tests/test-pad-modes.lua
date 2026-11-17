@@ -1,4 +1,4 @@
--- tests/test-pad-modes.lua: MPC pads mode (CC 94) and track mute mode (CC 96).
+-- tests/test-pad-modes.lua: MPC pads mode (CC 94).
 package.path = "./tests/?.lua;" .. package.path
 local mock = require("mock-mpc")
 _G.mpc = mock.mpc
@@ -13,25 +13,14 @@ local function assert_eq(a, b, msg)
 	end
 end
 
--- Dark means the LED was never re-sent since the last mock.reset() (diff cache skips
--- black-on-black) or was sent black.
-local function assert_dark(idx, msg)
-	local l = mock.leds[idx]
-	if l ~= nil and (l[1] ~= 0 or l[2] ~= 0 or l[3] ~= 0) then
-		error(msg .. ": expected pad " .. idx .. " dark, got " .. l[1] .. "," .. l[2] .. "," .. l[3])
-	end
-end
-
--- Grid notes of the two pad modes: pads mode = bottom-left 4x4 quadrant,
--- mute mode = the bottom two rows.
+-- Grid notes of pads mode: the bottom-left 4x4 quadrant.
 local PAD_NOTES = { 11, 12, 13, 14, 21, 22, 23, 24, 31, 32, 33, 34, 41, 42, 43, 44 }
-local MUTE_NOTES = { 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28 }
 
 L.OnLoad()
 
--- Both mode buttons are available (lighter grey), not active.
+-- The note button is available (lighter grey); custom (CC 96) is a stub and stays off.
 assert_eq(mock.leds[94][1], 60, "note button available")
-assert_eq(mock.leds[96][1], 60, "custom button available")
+assert_eq(mock.leds[96][1], 0, "custom button off (stub)")
 
 -- Enter pads mode (CC 94): the 16 quadrant notes move from the script to the MPC pads.
 -- A stopped clip sits under note 85 (grid col 4, MPC row 0) so the mode visibly darks it;
@@ -121,55 +110,13 @@ assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
 
--- Track mute mode (CC 96): the bottom two rows toggle the mutes of tracks 0-15.
+-- CC 96 is a stub again (mutes live on the CC 2 hold-function).
 mock.reset()
 L.HandleMIDICC(0, 96, 127)
-assert_eq(mock.count("AddNoteToTrackMute"), 16, "16 mute pads bound")
-for i, note in ipairs(MUTE_NOTES) do
-	local add = mock.find("AddNoteToTrackMute")[i]
-	assert_eq(add.args[2], note, "mute enter note " .. i)
-	assert_eq(add.args[3], i - 1, "mute enter track index " .. i)
-end
-assert_eq(mock.leds[96][1], 127, "custom button white in mute mode")
-assert_eq(mock.leds[11][2], 127, "track 0 shows its colour when unmuted")
-assert_dark(21, "track 8 dark with 8 tracks")
-
--- Muted pads turn dim grey on the next timer repaint.
-mock.tracks[0].Mute.value = true
-L.HandleTimer()
-assert_eq(mock.leds[11][1], 15, "muted pad grey red")
-assert_eq(mock.leds[11][2], 15, "muted pad grey green")
-assert_eq(mock.leds[11][3], 15, "muted pad grey blue")
-mock.tracks[0].Mute.value = false
-L.HandleTimer()
-assert_eq(mock.leds[11][2], 127, "unmuted pad back to the track colour")
-
--- Tracks beyond SizeNormalTracks stay dark.
-mock.setNormalTrackCount(5)
-L.HandleTimer()
-assert_eq(mock.leds[16][1], 0, "track 7 dark beyond SizeNormalTracks")
-assert_eq(mock.leds[16][2], 0, "track 7 dark green")
-mock.setNormalTrackCount(8)
-L.HandleTimer()
-
--- Mutual exclusion: CC 94 from mute mode switches straight to pads mode.
-mock.reset()
-L.HandleMIDICC(0, 94, 127)
-assert_eq(mock.count("RemoveNoteToTrackMute"), 16, "CC 94 exits mute mode")
-assert_eq(mock.count("AddNoteToMpcPad"), 16, "CC 94 enters pads mode")
-assert_eq(mock.leds[94][1], 127, "note button white")
-assert_eq(mock.leds[96][1], 60, "custom button back to available")
-mock.reset()
-L.HandleMIDICC(0, 96, 127)
-assert_eq(mock.count("AddNoteToTrackMute"), 16, "mute mode re-entered")
-
--- CC 93 session exits any mode back to the clip grid.
-mock.reset()
-L.HandleMIDICC(0, 93, 127)
-assert_eq(mock.count("RemoveNoteToTrackMute"), 16, "session exits mute mode")
-assert_eq(mock.leds[96][1], 60, "custom button back to available")
+assert_eq(mock.count("AddNoteToTrackMute"), 0, "no mute binding: CC 96 is a stub")
+assert_eq(mock.leds[96] and mock.leds[96][1] or 0, 0, "custom button off (stub)")
 L.HandleMIDINoteOn(0, 21, 100)
-assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after session")
+assert_eq(mock.count("TriggerClip"), 1, "clip launch unaffected by CC 96")
 
 -- Degrade: without mappings.pads the note button stays off and nothing breaks.
 local padsMapping = mock.dev.mappings.pads
@@ -182,20 +129,11 @@ L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch still works after failed pads mode")
 mock.dev.mappings.pads = padsMapping
 
--- Degrade: without mappings.tracks.mutes the custom button stays off.
-local mutesMapping = mock.dev.mappings.tracks.mutes
-mock.dev.mappings.tracks.mutes = nil
-mock.reset()
-L.HandleMIDICC(0, 96, 127)
-assert_eq(mock.leds[96][1], 0, "custom button off without mappings.tracks.mutes")
-assert_eq(mock.count("AddNoteToTrackMute"), 0, "no mute binding without mappings.tracks.mutes")
-mock.dev.mappings.tracks.mutes = mutesMapping
-
--- Unload while mute mode is active: the notes are handed back before unmapping.
-L.HandleMIDICC(0, 96, 127)
+-- Unload while pads mode is active: the notes are handed back before unmapping.
+L.HandleMIDICC(0, 94, 127)
 mock.reset()
 L.OnUnload()
-assert_eq(mock.count("RemoveNoteToTrackMute"), 16, "unload exits mute mode")
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "unload exits pads mode")
 assert_eq(mock.count("AddNoteToScript"), 16, "unload restores the notes")
 
 print("test-pad-modes: PASS")

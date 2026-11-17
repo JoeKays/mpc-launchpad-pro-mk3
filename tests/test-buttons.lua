@@ -111,13 +111,8 @@ assert_eq(mock.count("Overdub"), 1, "Overdub called")
 assert_eq(lastLog(), "LaunchpadProMK3: overdub", "overdub logged")
 L.HandleMIDICC(0, 10, 0)
 
-L.HandleMIDICC(0, 40, 127) -- shift + quantize = quantiser toggle
-assert_eq(lastLog(), "LaunchpadProMK3: quantiser: off", "quantiser off")
-assert_eq(mock.sequencer.quantiser.Enabled.value, false, "Enabled.value false")
-L.HandleMIDICC(0, 40, 0)
-L.HandleMIDICC(0, 40, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: quantiser: on", "quantiser on")
-assert_eq(mock.sequencer.quantiser.Enabled.value, true, "Enabled.value true")
+L.HandleMIDICC(0, 40, 127) -- quantize applies (no Shift variant)
+assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "quantize applied")
 L.HandleMIDICC(0, 40, 0)
 
 L.HandleMIDICC(0, 30, 127) -- shift + fixed length = automation filter cycle
@@ -175,27 +170,53 @@ assert_eq(
 L.HandleMIDICC(0, 30, 0)
 mock.mpc.project = savedProject
 
+-- Loop/overdub LED indicators: play orange while loop is on, record orange while overdubbing.
+mock.sequencer.Loop:set(true)
+assert_eq(mock.leds[20][1], 127, "play button orange while loop enabled")
+assert_eq(mock.leds[20][2], 60, "play button orange g while loop enabled")
+mock.sequencer.OverdubState:set(true)
+assert_eq(mock.leds[10][1], 127, "record button orange while overdubbing")
+assert_eq(mock.leds[10][2], 60, "record button orange g while overdubbing")
+mock.sequencer.Loop:set(false)
+mock.sequencer.OverdubState:set(false)
+assert_eq(mock.leds[20][1], 12, "play button dim with loop off, stopped")
+assert_eq(mock.leds[10][1], 12, "record button dim with overdub off")
+
+-- Shift + CC 93 toggles follow mode (off by default).
+local function logHas(s)
+	for _, l in ipairs(logs) do
+		if l == "LaunchpadProMK3: " .. s then
+			return true
+		end
+	end
+	return false
+end
+L.HandleMIDICC(0, 90, 127)
+L.HandleMIDICC(0, 93, 127)
+assert_eq(logHas("follow: on") and true or false, true, "follow toggle on")
+L.HandleMIDICC(0, 93, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: follow: off", "follow toggle off")
+L.HandleMIDICC(0, 90, 0)
+
 local savedLoop = mock.mpc.sequencer.Loop
 mock.mpc.sequencer.Loop = nil
+L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 20, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: loop unavailable: sequencer.Loop missing", "loop degrade")
 L.HandleMIDICC(0, 20, 0)
+L.HandleMIDICC(0, 90, 0)
 mock.mpc.sequencer.Loop = savedLoop
 
 local savedOverdub = mock.mpc.sequencer.Overdub
 mock.mpc.sequencer.Overdub = nil
+L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 10, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: overdub unavailable: sequencer.Overdub missing", "overdub degrade")
 L.HandleMIDICC(0, 10, 0)
+L.HandleMIDICC(0, 90, 0)
 mock.mpc.sequencer.Overdub = savedOverdub
 
-local savedEnabled = mock.mpc.sequencer.quantiser.Enabled
-mock.mpc.sequencer.quantiser.Enabled = nil
-L.HandleMIDICC(0, 40, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: quantiser unavailable: sequencer.quantiser.Enabled missing", "quantiser degrade")
-L.HandleMIDICC(0, 40, 0)
-mock.mpc.sequencer.quantiser.Enabled = savedEnabled
-
+L.HandleMIDICC(0, 90, 127)
 local savedNext = mock.mpc.tracks.currentTrack.Next
 mock.mpc.tracks.currentTrack.Next = nil
 L.HandleMIDICC(0, 92, 127)
@@ -209,6 +230,7 @@ L.HandleMIDICC(0, 94, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: preset unavailable: currentTrack.PrevPluginPreset missing", "preset degrade")
 L.HandleMIDICC(0, 94, 0)
 mock.mpc.tracks.currentTrack.PrevPluginPreset = savedPrevPreset
+L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 90, 0)
 
 L.OnUnload()

@@ -11,8 +11,8 @@ scripts as additional patterns.
 
 Phase 1 (clip mode) + transport + track row/function buttons + clip clear/duplicate +
 track volume/pan/sends + tap tempo + tempo page + swing page + quantize + Q-Link page +
-live clip states (listener-driven LEDs, current-track follow) + MPC pads mode + track
-mute mode + the Shift transport buttons (loop/overdub/quantiser/automation filter) +
+live clip states (listener-driven LEDs, optional current-track follow) + MPC pads mode +
+the Shift transport buttons (loop/overdub/automation filter) +
 track navigation, plugin presets and the firmware probe are implemented and host-tested.
 
 ## What it does
@@ -29,12 +29,13 @@ track navigation, plugin presets and the firmware probe are implemented and host
 - **Window scrolling**: 91/92 left/right, 80/70 up/down; Shift + 80/70 moves by 8,
   Shift + 91/92 = previous/next track. Scrolling re-registers the slot listeners for the
   new window.
-- **Follow current track**: the grid follows MPC's current track (`currentTrack.Index`
-  listener moves the window; the master track shows the Master matrix). The track row
-  (CC 101-108) selects tracks, so the grid follows track selection.
+- **Follow current track** (optional, off by default; Shift + CC 93 toggles): the grid
+  follows MPC's current track (`currentTrack.Index` listener moves the window; the
+  master track shows the Master matrix).
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo,
-  Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle,
-  Shift + 40 = quantiser on/off.
+  Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle.
+  The play LED shows loop state (green playing, orange loop armed) and the record LED
+  shows overdub (red recording, orange overdubbing).
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
   Shift + < / > (CC 91/92) = previous/next track; Shift + note/chord (CC 94/95) =
   previous/next plugin preset on the current track.
@@ -63,11 +64,8 @@ track navigation, plugin presets and the firmware probe are implemented and host
 - **MPC pads mode**: CC 94 hands the bottom-left 4x4 grid quadrant to the MPC pads
   (hardware-routed via `mappings.pads`) and mirrors the MPC pad colours on their LEDs;
   press again (or CC 93) to return to the clip grid.
-- **Track mute mode**: CC 96 turns the bottom two grid rows into mute toggles for tracks
-  0-15 via `mappings.tracks.mutes` (unmuted = track colour, muted = dim grey); press
-  again (or CC 93) to exit.
-- **Modes**: 93 session = clip, 94 note = MPC pads mode, 96 custom = track mute mode,
-  97 sequencer = step (stub); Shift + right-column 89/79/69 = clip/step/track modes.
+- **Modes**: 93 session = clip (Shift = toggle follow), 94 note = MPC pads mode,
+  96 custom = stub, 97 sequencer = step (stub); Shift + right-column 89/79/69 = clip/step/track modes.
   Pad modes, fader menus and tempo/swing pages are mutually exclusive.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
   pressed control white — use it to verify the physical mapping on your unit.

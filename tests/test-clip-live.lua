@@ -76,7 +76,16 @@ assert_eq(mock.count("MoveRight"), 1, "MoveRight")
 assert(mock.count("stopListening") - stops >= 192, "old grid listeners stopped on move")
 assert(mock.count("listen") - listens >= 192, "grid listeners rebound on move")
 
--- follow current track: normal track -> Normal matrix, window-local column
+-- follow is OFF by default: track changes do not move the window.
+local movesBefore = #mock.find("MoveToColumn")
+mock.mpc.tracks.currentTrack.Index:set(3)
+assert_eq(#mock.find("MoveToColumn"), movesBefore, "no follow by default")
+assert_eq(mock.getActiveMatrix(), "Normal", "matrix unchanged")
+
+-- Shift + CC 93 toggles follow on: normal track -> Normal matrix, window-local column
+L.HandleMIDICC(0, 90, 127)
+L.HandleMIDICC(0, 93, 127)
+L.HandleMIDICC(0, 90, 0)
 mock.mpc.tracks.currentTrack.Index:set(3)
 assert_eq(mock.getActiveMatrix(), "Normal", "matrix Normal for track 3")
 local moves = mock.find("MoveToColumn")

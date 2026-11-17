@@ -232,7 +232,13 @@ local padsControl = {
 	Release = function() end,
 }
 for i = 0, 15 do
-	padsControl[i] = { Colour = prop(0) }
+	local pcol = prop(0)
+	padsControl[i] = {
+		Colour = pcol,
+		GetColour = function()
+			return pcol.value
+		end,
+	}
 end
 
 -- aperture + clip properties
