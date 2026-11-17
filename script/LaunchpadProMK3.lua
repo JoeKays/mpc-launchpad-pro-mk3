@@ -1706,11 +1706,18 @@ local function applyFunction(fn, idx)
 	end
 end
 
--- Select a track (bottom-row CC 1-8 without a held function).
-local function selectTrack(idx)
+-- Select a track (bottom-row CC 101-108 without a held function). Two coordinates:
+-- the aperture takes a window-LOCAL column (same convention as SelectClip), while
+-- mpc.tracks.SetCurrentTrack takes the GLOBAL index and is what currentTrack — and
+-- everything reading it (note mode's track type, track nav, plugin presets) —
+-- follows. Call both so the column highlight and the real selection agree.
+local function selectTrack(col, gc)
+	if mpc.tracks and type(mpc.tracks.SetCurrentTrack) == "function" then
+		call(mpc.tracks.SetCurrentTrack, gc)
+		log("SetCurrentTrack(" .. gc .. ")")
+	end
 	if aperture then
-		call(aperture.SelectTrack, idx)
-		log("SelectTrack(" .. idx .. ")")
+		call(aperture.SelectTrack, col)
 	end
 end
 
@@ -2464,7 +2471,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		if heldFunction then
 			applyFunction(heldFunction, gc)
 		else
-			selectTrack(gc)
+			selectTrack(col, gc)
 		end
 		return
 	end

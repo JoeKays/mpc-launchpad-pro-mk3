@@ -59,6 +59,7 @@ local clipMatrix = {
 
 -- tracks
 local tracks = {}
+local mockCurrentTrackIndex = 0
 for i = 0, 7 do
 	local t = {
 		RecArm = prop(false),
@@ -463,6 +464,7 @@ local timer = {
 
 -- assemble
 local normalTrackCount = 8
+local currentIndex = prop(0)
 local mpc = {
 	clipMatrix = clipMatrix,
 	project = {
@@ -472,8 +474,12 @@ local mpc = {
 	},
 	tracks = {
 		normalTracks = tracks,
+		SetCurrentTrack = function(idx)
+			record("SetCurrentTrack", idx)
+			currentIndex.value = idx
+		end,
 		currentTrack = {
-			Index = prop(0),
+			Index = currentIndex,
 			Type = prop("Drum"),
 			Previous = function()
 				record("currentTrack.Previous")

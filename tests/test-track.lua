@@ -59,6 +59,7 @@ L.HandleMIDICC(0, 8, 0)
 -- track select without a held function
 L.HandleMIDICC(0, 101, 127)
 assert_eq(mock.count("SelectTrack"), 1, "SelectTrack")
+assert_eq(mock.count("SetCurrentTrack"), 1, "track select sets the real current track")
 assert_eq(mock.find("SelectTrack")[1].args[1], 0, "track 0")
 
 -- after scrolling right by 1, CC 101 (first grid column) controls global track 1

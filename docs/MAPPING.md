@@ -72,7 +72,10 @@ Hold CC 8 and press a track button (CC 101-108) to stop that track's clips, or h
 and press a clip pad to stop the clips on that pad's track. The clip pad does not launch
 while stop clip is held.
 
-Track row CC 101-108: track 0 = CC 101, ..., track 7 = CC 108. The track index follows
+Track row CC 101-108: track 0 = CC 101, ..., track 7 = CC 108. Selection goes through
+`mpc.tracks.SetCurrentTrack` (global index — the same `currentTrack` note mode, track
+nav and plugin presets read) plus the window-local `aperture.SelectTrack` highlight.
+The track index follows
 the grid window: after scrolling right by one, CC 101 controls the track now in the first
 grid column (global track 1), not global track 0. The track buttons show the held
 function's state (mute = orange, solo = yellow, rec arm = red) or the track colour.
