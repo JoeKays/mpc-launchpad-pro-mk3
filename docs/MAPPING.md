@@ -30,7 +30,7 @@ and press it again to exit.
 | 3 | solo | click/metronome |
 | 4 | volume menu | — |
 | 5 | pan menu | — |
-| 6 | sends menu | cycle send 1-4 (while the sends menu is open) |
+| 6 | sends menu | tap again to cycle send 1-4 |
 | 7 | device (stub) | tempo (stub) |
 | 8 | stop clip | swing (stub) |
 
@@ -65,15 +65,16 @@ leaves the surface working.
 Press volume (CC 4), pan (CC 5) or sends (CC 6) to open a fader menu. The grid becomes
 a bank of faders aligned with the clip view: each grid column is a track, each row is a
 level. The fader fills from the bottom (row 7 = 0.0) to the top (row 0 = 1.0). Press a
-pad in a column to set that track's value to `(7 - row) / 7`. Press the same function
-button again to exit the menu.
+pad in a column to set that track's value to `(8 - row) / 8`. Press volume or pan again
+to exit the menu; tapping sends cycles send 1-4.
 
 | Action | Effect |
 |---|---|
-| Grid pad in column `c`, row `r` | Sets global track `c`'s value to `(7 - r) / 7` |
+| Grid pad in column `c`, row `r` | Sets global track `c`'s value to `(8 - r) / 8` |
+| Double-tap the bottom pad | Sets the true minimum (0.0) |
 | Up (CC 80) | Nudges the last touched track's value by +1/8, clamped to 0..1 |
 | Down (CC 70) | Nudges the last touched track's value by -1/8, clamped to 0..1 |
-| Shift + sends (CC 6) while the sends menu is open | Cycles send 1-4 |
+| Tap sends (CC 6) while the sends menu is open | Cycles send 1-4 |
 
 Volume and pan write `mpc.tracks.normalTracks[i].Volume.value` / `.Pan.value` (0..1,
 pan 0.5 = centre). Sends write `.Send1`..`.Send4.value` (0..1). The faders are cyan
@@ -125,8 +126,10 @@ Primary = row trigger (scene launch); Shift = the label functions.
 CC 50/60 use `mpc.clipMatrix.CopyClip(fromColumn, fromRow, toColumn, toRow)` and
 `mpc.clipMatrix.DeleteClip(column, row)`. Press CC 50 to arm duplicate, press the origin
 clip pad, then the target clip pad. Press CC 60 to arm clear, then press the clip pad.
-The calls are guarded: if the API is missing the script logs the attempted call and
-leaves the surface working.
+The op stays armed after each clip, so you can clear or duplicate several clips while
+holding the button; duplicate resets the origin after each copy. The API row is
+`7 - visual row` (the API counts from the bottom). The calls are guarded: if the API is
+missing the script logs the attempted call and leaves the surface working.
 
 ## LED feedback
 

@@ -32,8 +32,7 @@ stubbed for later phases.
   the origin pad, then the target pad); CC 40 quantize is a stub.
 - **Track controls**: press volume/pan/sends (CC 4/5/6) to open a fader menu aligned with
   the clip view; press a grid pad to set a track's value, up/down (CC 80/70, ±1/8) to
-  nudge, and press the function button again to exit. Shift + CC 6 cycles sends while the
-  sends menu is open. Volume/pan/sends write `normalTracks[i].Volume/Pan/Send1-4.value`.
+  nudge, and press the function button again to exit; tapping CC 6 cycles sends. Volume/pan/sends write `normalTracks[i].Volume/Pan/Send1-4.value`.
 - **Modes**: 93 session = clip, 97 sequencer = step (stub); Shift + right-column 89/79/69 =
   clip/step/track modes.
 - **Probe mode**: Shift + 99 (Novation logo) logs every incoming note/CC and lights the
