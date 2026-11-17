@@ -98,13 +98,11 @@ L.HandleMIDICC(0, 80, 127)
 assert_eq(mock.count("SetBPM"), 1, "tempo page closed by pads mode")
 assert_eq(mock.count("MoveUp"), 1, "up moves the window again")
 
--- Exiting to the clip grid now takes two more taps (drum -> chromatic -> off).
+-- Exiting to the clip grid is one tap (the drum track never offers chromatic).
 mock.reset()
-L.HandleMIDICC(0, 94, 127) -- drum -> chromatic
-assert_eq(mock.count("AddNoteToVirtualPad"), 64, "second tap is chromatic, not exit")
-mock.reset()
-L.HandleMIDICC(0, 94, 127) -- chromatic -> off
-assert_eq(mock.count("AddNoteToScript"), 64, "exit restores all 64 notes")
+L.HandleMIDICC(0, 94, 127)
+assert_eq(mock.count("AddNoteToVirtualPad"), 0, "no chromatic on a drum track")
+assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the drum notes")
 assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
@@ -162,19 +160,30 @@ mock.reset()
 L.HandleMIDICC(0, 95, 127)
 assert_eq(mock.count("noteRepeat.Press"), 0, "no pad utility outside pads mode")
 
--- Tapping Note iterates the layouts: clip grid -> drum -> chromatic -> clip grid.
+-- Track type fixes the layout: drum tracks toggle drum <-> clip grid (2-state).
 mock.reset()
-L.HandleMIDICC(0, 94, 127) -- enter pads mode (drum)
-assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout on first tap")
-L.HandleMIDICC(0, 94, 127) -- second tap: chromatic
-assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "drum unbound on the second tap")
+L.HandleMIDICC(0, 94, 127) -- enter pads mode (drum track)
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout for a drum track")
+mock.reset()
+L.HandleMIDICC(0, 94, 127) -- exit (single tap, never chromatic)
+assert_eq(mock.count("AddNoteToVirtualPad"), 0, "no chromatic on a drum track")
+assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the drum notes")
+assert_eq(mock.leds[94][1], 60, "note button back to available")
+L.HandleMIDINoteOn(0, 11, 100)
+assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
+
+-- Melodic tracks toggle chromatic <-> clip grid (2-state).
+mock.reset()
+mock.mpc.tracks.currentTrack.Type.value = "Plugin"
+L.HandleMIDICC(0, 94, 127)
+assert_eq(mock.count("AddNoteToMpcPad"), 0, "no drum binding on a plugin track")
 assert_eq(mock.count("AddNoteToVirtualPad"), 64, "64 virtual pads bound")
 local first = mock.find("AddNoteToVirtualPad")[1]
 assert_eq(first.args[3], 12, "bottom-left virtual pad = base 48 - 36")
 assert_eq(mock.find("AddNoteToVirtualPad")[9].args[3], 17, "row above starts a 4th higher")
 assert_eq(mock.leds[94][2], 127, "note button cyan in chromatic layout")
 assert_eq(mock.leds[94][1], 0, "note button cyan r")
-assert_eq(mock.leds[11][3], 127, "C note full blue b")
+assert_eq(mock.leds[11][2], 60, "C note full blue g")
 assert_eq(mock.leds[11][1], 0, "C note blue r")
 assert_eq(mock.leds[12][3], 30, "non-C note dim blue tint b")
 -- octave up: rebinds one octave higher (the latest 64 bindings)
@@ -186,26 +195,13 @@ L.HandleMIDICC(0, 80, 127)
 assert_eq(latestVirtual().args[3], 24, "base shifted +12 (60 - 36)")
 L.HandleMIDICC(0, 70, 127)
 assert_eq(latestVirtual().args[3], 12, "base shifted back (48 - 36)")
--- third tap exits back to the clip grid; leaving chromatic resets the MPC pad bank
+-- exit: single tap, restores all notes and resets the MPC pad bank
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("RemoveNoteToVirtualPad"), 64, "exit unbinds the virtual pads")
 assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
 assert_eq(mock.count("bank1.Press"), 1, "leaving chromatic resets the pad bank")
-assert_eq(mock.leds[94][1], 60, "note button available after exit")
-
--- Track-type-aware first layout: a Plugin track opens straight into chromatic.
-mock.reset()
-mock.mpc.tracks.currentTrack.Type.value = "Plugin"
-L.HandleMIDICC(0, 94, 127)
-assert_eq(mock.count("AddNoteToVirtualPad"), 64, "plugin track starts in chromatic")
-assert_eq(mock.count("AddNoteToMpcPad"), 0, "no drum binding for a plugin track")
-mock.reset()
-L.HandleMIDICC(0, 94, 127) -- chromatic -> drum
-assert_eq(mock.count("AddNoteToMpcPad"), 16, "second tap still iterates to drum")
-mock.reset()
-L.HandleMIDICC(0, 94, 127) -- drum -> off (drum notes restore)
-assert_eq(mock.count("AddNoteToScript"), 16, "third tap exits")
+assert_eq(mock.count("AddNoteToMpcPad"), 0, "chromatic exit never binds drums")
 mock.mpc.tracks.currentTrack.Type.value = "Drum"
 
 print("test-pad-modes: PASS")

@@ -1603,8 +1603,10 @@ local function firstLayoutForTrack()
 	return "drum", trackType
 end
 
--- Tapping Note iterates: clip grid -> layout (chosen from the track type) ->
--- the other layout -> clip grid.
+-- Tapping Note toggles the pads mode with the layout fixed by the track type:
+-- drum tracks get the drum layout, melodic tracks get chromatic. The unsuitable
+-- layout is never offered (chromatic on a drum program is silent, and the drum
+-- grid is meaningless on a synth track).
 local function togglePadsMode()
 	if not padsMode then
 		local layout, trackType = firstLayoutForTrack()
@@ -1615,13 +1617,6 @@ local function togglePadsMode()
 		if padsMode then
 			paintPadsGrid(true) -- immediate mirror, independent of the tick parity
 		end
-		return
-	end
-	-- in-mode taps: first switch to the other layout, the next tap exits
-	if padsLayout == firstLayoutForTrack() then
-		padsLayout = (padsLayout == "drum") and "chromatic" or "drum"
-		exitPadsMode()
-		enterPadsMode()
 		return
 	end
 	exitPadsMode()

@@ -201,11 +201,12 @@ of the grid is dark and inert. Press the mode button again, press CC 93 (session
 another mode or page, or unload to exit: the 16 notes return to the script and the
 normal clip grid is repainted.
 
-Tapping the Note button iterates clip grid -> first layout -> other layout -> clip
-grid (CC 93 session also exits at any point). The first layout is chosen from the
-current track's `Type`: pad-based Drum programs start in **drum**, melodic
-Plugin/Keygroup/MIDI tracks start in **chromatic** (the journal logs
-`track type Plugin -> chromatic`):
+Tapping the Note button toggles the pads mode, and the track's `Type` fixes which
+layout you get: pad-based Drum programs toggle clip grid <-> **drum**, melodic
+Plugin/Keygroup/MIDI tracks toggle clip grid <-> **chromatic** (the journal logs
+`track type Plugin -> chromatic`). The unsuitable layout is never offered — chromatic
+is silent on drum programs and the drum grid is meaningless on a synth track. CC 93
+(session) also exits at any point.
 
 - **drum** (default): entering presses the MPC's Main screen button
   (`controlSurface.main`) first so its pad grid lights (the MPC reports black pads on
