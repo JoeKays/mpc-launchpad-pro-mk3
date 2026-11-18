@@ -4,7 +4,7 @@ local mock = require("mock-mpc")
 _G.mpc = mock.mpc
 _G.dev = mock.dev
 _G.LaunchpadProMK3 = mock.dev
-dofile("script/LaunchpadProMK3.lua")
+dofile(os.getenv("LPP3_LUA") or "script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)
@@ -94,7 +94,7 @@ _G.print = function(...)
 	end
 	logs[#logs + 1] = table.concat(parts, " ")
 end
-dofile("script/LaunchpadProMK3.lua")
+dofile(os.getenv("LPP3_LUA") or "script/LaunchpadProMK3.lua")
 L = LaunchpadProMK3
 L.OnLoad()
 L.HandleMIDICC(0, 60, 127)

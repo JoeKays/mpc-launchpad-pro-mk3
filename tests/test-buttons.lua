@@ -6,7 +6,7 @@ local mock = require("mock-mpc")
 _G.mpc = mock.mpc
 _G.dev = mock.dev
 _G.LaunchpadProMK3 = mock.dev
-dofile("script/LaunchpadProMK3.lua")
+dofile(os.getenv("LPP3_LUA") or "script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
 local function assert_eq(a, b, msg)

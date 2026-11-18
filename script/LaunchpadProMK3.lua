@@ -162,7 +162,6 @@ local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or pads64 (all four banks)
 local boundPadNotes = {} -- grid notes currently routed away from the script
 local chromaticVirtualPad -- forward declaration (defined with the pad-mode helpers)
-local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
 local programmerEntered = false
@@ -210,6 +209,37 @@ local function propValue(obj, name)
 		return v
 	end
 	return nil
+end
+
+-- Safe accessor: the member when it exists with the expected type, else nil.
+-- mpc.* objects are sol2 tables/userdata; a missing build field must never raise.
+local function member(obj, key, kind)
+	if obj == nil then
+		return nil
+	end
+	local v = obj[key]
+	if v ~= nil and (kind == nil or type(v) == kind) then
+		return v
+	end
+	return nil
+end
+
+-- Shorthand for member(obj, key, "function"): the callable, or nil.
+local function callable(obj, key)
+	return member(obj, key, "function")
+end
+
+-- Call currentTrack.<field>() with a one-time log when the build lacks it.
+-- Returns true when the action ran.
+local function trackAction(field, logKey, label)
+	local ct = mpc.tracks and mpc.tracks.currentTrack
+	local f = callable(ct, field)
+	if not f then
+		logOnce(logKey, label .. " unavailable: currentTrack." .. field .. " missing")
+		return false
+	end
+	call(f)
+	return true
 end
 
 local function clamp01(v)
@@ -392,6 +422,11 @@ local function ledRGB(index, r, g, b)
 	end
 	padCache[index] = key
 	addSpec(string.char(3, index % 128, r, g, b))
+end
+
+-- Paint one button with a {r,g,b} colour table from C (the palette above).
+local function ledCol(index, colour)
+	ledRGB(index, colour[1], colour[2], colour[3])
 end
 
 local function ledOff(index)
@@ -579,9 +614,9 @@ local function paintAdjustGrid()
 				local idx = 10 * (8 - row) + col + 1
 				local fromBottom = 7 - row
 				if fromBottom < litCount then
-					ledRGB(idx, colour[1], colour[2], colour[3])
+					ledCol(idx, colour)
 				else
-					ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+					ledCol(idx, C.dim)
 				end
 			end
 		else
@@ -803,14 +838,14 @@ local function paintQlinkGrid()
 			elseif qlinkFlip[i] then
 				-- binary parameter: only the matching extreme pad is lit (top = max)
 				if (pos >= 64 and row == 0) or (pos < 64 and row == GRID_ROWS - 1) then
-					ledRGB(idx, colour[1], colour[2], colour[3])
+					ledCol(idx, colour)
 				else
-					ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+					ledCol(idx, C.dim)
 				end
 			elseif fromBottom < litCount then
-				ledRGB(idx, colour[1], colour[2], colour[3])
+				ledCol(idx, colour)
 			else
-				ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+				ledCol(idx, C.dim)
 			end
 		end
 	end
@@ -914,7 +949,7 @@ local function paintClipSlot(col, row)
 	local idx = 10 * (8 - row) + col + 1
 	if state < 2 then
 		if propValue(p, "Selected") == true then
-			ledRGB(idx, C.available[1], C.available[2], C.available[3])
+			ledCol(idx, C.available)
 		else
 			ledOff(idx)
 		end
@@ -1059,7 +1094,7 @@ local function paintScene()
 			state = propValue(aperture.sceneProperties[row], "State")
 		end
 		if state == S.Playing or state == S.Recording then
-			ledRGB(idx, C.green[1], C.green[2], C.green[3])
+			ledCol(idx, C.green)
 		elseif state == S.WillPlay or state == S.WillRecord then
 			ledRGB(
 				idx,
@@ -1068,7 +1103,7 @@ local function paintScene()
 				blinkOn and C.green[3] or C.dim[3]
 			)
 		else
-			ledRGB(idx, C.dim[1], C.dim[2], C.dim[3])
+			ledCol(idx, C.dim)
 		end
 	end
 end
@@ -1106,14 +1141,14 @@ local function paintTrack()
 	local sends = fnColour("sends")
 	local device = fnColour("device")
 	local stopClip = fnColour("stopClip")
-	ledRGB(TRACK.recArm, arm[1], arm[2], arm[3])
-	ledRGB(TRACK.mute, mute[1], mute[2], mute[3])
-	ledRGB(TRACK.solo, solo[1], solo[2], solo[3])
-	ledRGB(TRACK.volume, volume[1], volume[2], volume[3])
-	ledRGB(TRACK.pan, pan[1], pan[2], pan[3])
-	ledRGB(TRACK.sends, sends[1], sends[2], sends[3])
-	ledRGB(TRACK.device, device[1], device[2], device[3])
-	ledRGB(TRACK.stopClip, stopClip[1], stopClip[2], stopClip[3])
+	ledCol(TRACK.recArm, arm)
+	ledCol(TRACK.mute, mute)
+	ledCol(TRACK.solo, solo)
+	ledCol(TRACK.volume, volume)
+	ledCol(TRACK.pan, pan)
+	ledCol(TRACK.sends, sends)
+	ledCol(TRACK.device, device)
+	ledCol(TRACK.stopClip, stopClip)
 	-- CC 101-108: track buttons. Show the held function's state per track, or the track colour.
 	for col = 0, 7 do
 		local gc = globalPos(col, 0)
@@ -1149,7 +1184,6 @@ local function paintTrack()
 end
 
 local padsLayoutAvailable -- forward declaration (defined with the pad-mode helpers)
-local padsLayoutAvailable -- forward declaration (defined with the pad-mode helpers)
 
 local function paintTop()
 	local function modeColour(m)
@@ -1170,13 +1204,13 @@ local function paintTop()
 	end
 	local chord = C.available -- opens the MPC's Pad Perform page on press
 	local custom = C.off -- stub (capture MIDI lives on Shift + record)
-	ledRGB(TOP.session, session[1], session[2], session[3])
-	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
-	ledRGB(TOP.note, note[1], note[2], note[3])
-	ledRGB(TOP.chord, chord[1], chord[2], chord[3])
-	ledRGB(TOP.custom, custom[1], custom[2], custom[3])
-	ledRGB(TOP.left, C.dim[1], C.dim[2], C.dim[3])
-	ledRGB(TOP.right, C.dim[1], C.dim[2], C.dim[3])
+	ledCol(TOP.session, session)
+	ledCol(TOP.sequencer, sequencer)
+	ledCol(TOP.note, note)
+	ledCol(TOP.chord, chord)
+	ledCol(TOP.custom, custom)
+	ledCol(TOP.left, C.dim)
+	ledCol(TOP.right, C.dim)
 	local saveAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.save ~= nil
 	ledRGB(
 		TOP.save,
@@ -1200,19 +1234,19 @@ local function paintLeft()
 	local loop = propValue(sq, "Loop")
 	-- play: green while playing, orange while loop is enabled, dim otherwise
 	if playing then
-		ledRGB(LEFT.play, C.green[1], C.green[2], C.green[3])
+		ledCol(LEFT.play, C.green)
 	elseif loop then
-		ledRGB(LEFT.play, C.orange[1], C.orange[2], C.orange[3])
+		ledCol(LEFT.play, C.orange)
 	else
-		ledRGB(LEFT.play, C.dim[1], C.dim[2], C.dim[3])
+		ledCol(LEFT.play, C.dim)
 	end
 	-- record: red while recording, orange while overdubbing, dim otherwise
 	if recording then
-		ledRGB(LEFT.record, C.red[1], C.red[2], C.red[3])
+		ledCol(LEFT.record, C.red)
 	elseif overdub then
-		ledRGB(LEFT.record, C.orange[1], C.orange[2], C.orange[3])
+		ledCol(LEFT.record, C.orange)
 	else
-		ledRGB(LEFT.record, C.dim[1], C.dim[2], C.dim[3])
+		ledCol(LEFT.record, C.dim)
 	end
 	ledOff(LEFT.fixedLength)
 	local quantizeAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.quantizeApply ~= nil
@@ -1225,8 +1259,8 @@ local function paintLeft()
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
 	local pageColour = tempoMode and C.white
 		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or adjustColour()))
-	ledRGB(LEFT.duplicate, C.white[1], C.white[2], C.white[3])
-	ledRGB(LEFT.clear, C.white[1], C.white[2], C.white[3])
+	ledCol(LEFT.duplicate, C.white)
+	ledCol(LEFT.clear, C.white)
 	ledRGB(
 		LEFT.down,
 		nudgeOn and pageColour[1] or C.white[1],
@@ -1440,10 +1474,10 @@ end
 -- performance modes and their key/scale settings — via controlSurface.padPerform.
 
 local function pressSurfaceButton(name)
-	local b = mpc.controlSurface and mpc.controlSurface[name]
-	if b and type(b.Press) == "function" then
-		call(b.Press)
-		call(b.Release)
+	local press = callable(mpc.controlSurface and mpc.controlSurface[name], "Press")
+	if press then
+		call(press)
+		call(callable(mpc.controlSurface[name], "Release"))
 		return true
 	end
 	return false
@@ -1454,10 +1488,8 @@ padsLayoutAvailable = function()
 	if not pads then
 		return false
 	end
-	if padsLayout == "pads64" then
-		return type(pads.AddNoteToVirtualPad) == "function"
-	end
-	return type(pads.AddNoteToMpcPad) == "function"
+	local field = (padsLayout == "pads64") and "AddNoteToVirtualPad" or "AddNoteToMpcPad"
+	return callable(pads, field) ~= nil
 end
 
 local function openPadPerformPage()
@@ -1675,8 +1707,9 @@ end
 -- everything reading it (note mode's track type, track nav, plugin presets) —
 -- follows. Call both so the column highlight and the real selection agree.
 local function selectTrack(col, gc)
-	if mpc.tracks and type(mpc.tracks.SetCurrentTrack) == "function" then
-		call(mpc.tracks.SetCurrentTrack, gc)
+	local setCurrent = callable(mpc.tracks, "SetCurrentTrack")
+	if setCurrent then
+		call(setCurrent, gc)
 		log("SetCurrentTrack(" .. gc .. ")")
 	end
 	if aperture then
@@ -1753,11 +1786,10 @@ local function changeSwing(delta)
 end
 
 local function doQuantize()
-	local cs = mpc.controlSurface
-	local qa = cs and cs.quantizeApply
-	if qa and type(qa.Press) == "function" then
-		call(qa.Press)
-		call(qa.Release)
+	local press = callable(mpc.controlSurface and mpc.controlSurface.quantizeApply, "Press")
+	if press then
+		call(press)
+		call(callable(mpc.controlSurface.quantizeApply, "Release"))
 		log("quantize applied")
 	else
 		logOnce("quantize", "quantize unavailable: controlSurface.quantizeApply missing")
@@ -1883,9 +1915,9 @@ local function doTapTempo()
 	local bpm = (useMs and 60000 or 1200) / avg
 	bpm = math.max(20, math.min(300, bpm))
 	bpm = math.floor(bpm + 0.5) -- MPC BPM is an integer
-	local sq = mpc.sequencer
-	if sq and type(sq.SetBPM) == "function" then
-		call(sq.SetBPM, bpm)
+	local setBPM = callable(mpc.sequencer, "SetBPM")
+	if setBPM then
+		call(setBPM, bpm)
 		log(string.format("tap tempo: %d BPM (%.1f ms)", bpm, avg))
 	else
 		logOnce("tapbpm", "tap tempo unavailable: sequencer.SetBPM missing")
@@ -2035,38 +2067,30 @@ end
 
 -- Shift + fixed length (CC 30): cycle the global automation filter type.
 local function doAutomationFilterCycle()
-	local pr = mpc.project
-	if not (pr and type(pr.AdvanceGlobalAutomationFilterType) == "function") then
+	local f = callable(mpc.project, "AdvanceGlobalAutomationFilterType")
+	if not f then
 		logOnce("autofilter", "automation filter unavailable: project.AdvanceGlobalAutomationFilterType missing")
 		return
 	end
-	call(pr.AdvanceGlobalAutomationFilterType)
+	call(f)
 	log("automation filter: cycled")
 end
 
 -- Shift + < / > (CC 91/92): MPC's current track previous/next.
 local function doTrackNav(forward)
-	local ct = mpc.tracks and mpc.tracks.currentTrack
-	local f = forward and "Next" or "Previous"
-	if not (ct and type(ct[f]) == "function") then
-		logOnce("tracknav", "track nav unavailable: currentTrack." .. f .. " missing")
-		return
+	local field = forward and "Next" or "Previous"
+	if trackAction(field, "tracknav", "track nav") then
+		log("track: " .. (forward and "next" or "prev"))
 	end
-	call(ct[f])
-	log("track: " .. (forward and "next" or "prev"))
 end
 
 -- Shift + note/chord (CC 94/95): previous/next plugin preset on the current
 -- track (present on track objects in 3.10.1).
 local function doPluginPreset(forward)
-	local ct = mpc.tracks and mpc.tracks.currentTrack
-	local f = forward and "NextPluginPreset" or "PrevPluginPreset"
-	if not (ct and type(ct[f]) == "function") then
-		logOnce("preset", "preset unavailable: currentTrack." .. f .. " missing")
-		return
+	local field = forward and "NextPluginPreset" or "PrevPluginPreset"
+	if trackAction(field, "preset", "preset") then
+		log("preset: " .. (forward and "next" or "prev"))
 	end
-	call(ct[f])
-	log("preset: " .. (forward and "next" or "prev"))
 end
 
 local function moveWindow(dir, n)
@@ -2087,21 +2111,22 @@ end
 -- was just played into a new clip row (same as the on-screen Capture button).
 local function doCaptureMidi()
 	local cm = mpc.clipMatrix or mpc.masterClipMatrix
-	if not (cm and type(cm.InsertRowAndCapture) == "function") then
+	local f = callable(cm, "InsertRowAndCapture")
+	if not f then
 		logOnce("capture", "capture unavailable: clipMatrix.InsertRowAndCapture missing")
 		return
 	end
-	call(cm.InsertRowAndCapture)
+	call(f)
 	log("capture: row inserted, MIDI captured to clip")
 end
 
 local function probe(note, cc, value)
 	log(string.format("PROBE note=%s cc=%s value=%s", tostring(note), tostring(cc), tostring(value)))
 	if note then
-		ledRGB(note, C.white[1], C.white[2], C.white[3])
+		ledCol(note, C.white)
 	end
 	if cc then
-		ledRGB(cc, C.white[1], C.white[2], C.white[3])
+		ledCol(cc, C.white)
 	end
 	flushLEDs()
 end
@@ -2174,157 +2199,60 @@ function LaunchpadProMK3.HandleMIDINoteOff(_channel, _note, _velocity)
 	-- LPP3 sends Note On with velocity 0 for Note Off; nothing to do here
 end
 
-function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
-	if channel ~= 0 then
-		return
-	end
-	if probeMode then
-		probe(nil, cc, value)
-		return
-	end
-	if value == 0 then
-		if cc == TOP.shift then
-			shift = false
-			updateTapTempoRouting(false)
-			paintTop()
-			flushLEDs()
-		end
-		-- clip ops are hold-to-arm: releasing clear/duplicate disarms them
-		if cc == LEFT.clear or cc == LEFT.duplicate then
-			clipOp = nil
-			clipOrigin = nil
-			paintAll()
-			flushLEDs()
-		end
-		-- releasing the tempo up/down button stops the auto-repeat
-		if cc == LEFT.up or cc == LEFT.down then
-			tempoHold = nil
-			swingHold = nil
-		end
-		local fn = TRACK_FN[cc]
-		-- only the button that is actually held clears the hold; releasing a
-		-- shift-function button must not drop a function held from before Shift
-		if fn and fn == heldFunction then
-			heldFunction = nil
-			paintTrack()
-			flushLEDs()
-		end
-		return
-	end
+-- ==== CC dispatch ==========================================================
+-- Two action maps: PRESS runs on a plain press, SHIFT_PRESS when Shift is held.
+-- A control with no SHIFT_PRESS entry keeps its plain action while Shift is
+-- held. Context-sensitive controls (up/down pages, function buttons, scenes,
+-- track row) branch inside small named handlers.
+
+local function ccShiftDown()
+	shift = false
+	updateTapTempoRouting(false)
+	paintTop()
+	flushLEDs()
+end
+
+local function ccRelease(cc)
 	if cc == TOP.shift then
-		shift = true
-		updateTapTempoRouting(true)
-		paintTop()
-		flushLEDs()
-		return
+		ccShiftDown()
 	end
-	if cc == RIGHT.logo then
-		if shift then
-			probeMode = not probeMode
-			log("probe mode " .. tostring(probeMode))
-			paintRight()
-			flushLEDs()
-		else
-			log("status: mode=" .. mode .. " shift=" .. tostring(shift))
-		end
-		return
-	end
-	if cc == TOP.session then
-		if shift then
-			followMode = not followMode
-			log("follow: " .. (followMode and "on" or "off"))
-			if followMode then
-				followCurrentTrack(propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
-			else
-				paintTop()
-				flushLEDs()
-			end
-			return
-		end
-		setMode("clip")
-		return
-	end
-	if cc == TOP.sequencer then
-		if shift then
-			if pressSurfaceButton("stepSeqNext") then
-				log("step seq: next")
-			else
-				logOnce("stepseqnext", "step seq next unavailable: controlSurface.stepSeqNext missing")
-			end
-		elseif pressSurfaceButton("stepSeq") then
-			setMode("step")
-			log("step seq view")
-		else
-			logOnce("stepseq", "step seq unavailable: controlSurface.stepSeq missing")
-		end
-		return
-	end
-	if shift and cc == TOP.note then
-		doPluginPreset(false)
-		return
-	end
-	if shift and cc == TOP.chord then
-		doPluginPreset(true)
-		return
-	end
-	if cc == TOP.chord then
-		openPadPerformPage()
-		return
-	end
-	if cc == TOP.note then
-		togglePadsMode()
+	-- clip ops are hold-to-arm: releasing clear/duplicate disarms them
+	if cc == LEFT.clear or cc == LEFT.duplicate then
+		clipOp = nil
+		clipOrigin = nil
 		paintAll()
-		return
+		flushLEDs()
 	end
-	if cc == TOP.custom then
-		logOnce("custom", "custom button: unmapped (capture MIDI lives on Shift + record)")
-		return
+	-- releasing the tempo up/down button stops the auto-repeat
+	if cc == LEFT.up or cc == LEFT.down then
+		tempoHold = nil
+		swingHold = nil
 	end
-	for row = 0, 7 do
-		if cc == SCENE[row + 1] then
-			if shift then
-				handleRightLabel(row)
-			else
-				doScene(row)
-			end
-			return
-		end
+	-- only the button that is actually held clears the hold; releasing a
+	-- shift-function button must not drop a function held from before Shift
+	local held = TRACK_FN[cc]
+	if held and held == heldFunction then
+		heldFunction = nil
+		paintTrack()
+		flushLEDs()
 	end
-	if cc == TOP.left then
-		if shift then
-			doTrackNav(false)
-		else
-			moveWindow("left", 1)
-		end
-		return
-	end
-	if cc == TOP.right then
-		if shift then
-			doTrackNav(true)
-		else
-			moveWindow("right", 1)
-		end
-		return
-	end
-	if tempoMode and (cc == LEFT.up or cc == LEFT.down) then
-		tempoHold = cc
+end
+
+-- Up/down arrows: the active page decides what they nudge.
+local function ccUpDown(delta)
+	if tempoMode then
+		tempoHold = (delta > 0) and LEFT.up or LEFT.down
 		tempoHoldTicks = 0
-		changeTempo(cc == LEFT.up and 1 or -1)
-		return
-	end
-	if swingMode and (cc == LEFT.up or cc == LEFT.down) then
-		swingHold = cc
+		changeTempo(delta)
+	elseif swingMode then
+		swingHold = (delta > 0) and LEFT.up or LEFT.down
 		swingHoldTicks = 0
-		changeSwing(cc == LEFT.up and 1 or -1)
-		return
-	end
-	if adjustMode and (cc == LEFT.up or cc == LEFT.down) then
-		nudgeAdjust(cc == LEFT.up and 1 / 8 or -1 / 8)
-		return
-	end
-	if qlinkMode and (cc == LEFT.up or cc == LEFT.down) then
+		changeSwing(delta)
+	elseif adjustMode then
+		nudgeAdjust(delta / 8)
+	elseif qlinkMode then
 		if shift then
-			nudgeQlink(cc == LEFT.up and 1 or -1)
+			nudgeQlink(delta)
 		elseif qlinkPage == 0 and qlinkPageHasContent(1) then
 			qlinkPage = 1
 			log("qlink page 2")
@@ -2334,114 +2262,233 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 			log("qlink page 1")
 			paintAll()
 		end
-		return
+	else
+		moveWindow((delta > 0) and "up" or "down", shift and 8 or 1)
 	end
-	if cc == LEFT.up then
-		moveWindow("up", shift and 8 or 1)
-		return
-	end
-	if cc == LEFT.down then
-		moveWindow("down", shift and 8 or 1)
-		return
-	end
-	if cc == LEFT.play then
-		if shift then
-			doLoopToggle()
+end
+
+local function armClipOp(kind)
+	clipOp = kind
+	clipOrigin = nil
+	log(
+		"clip op "
+			.. kind
+			.. " armed: "
+			.. (kind == "clear" and "press the clip pad" or "press origin pad, then target pad")
+	)
+	paintAll()
+end
+
+local function ccFunctionButton(fn)
+	if shift then
+		doShiftFunction(fn)
+		paintTrack()
+		flushLEDs()
+	elseif fn == "sends" then
+		if adjustMode == "sends" then
+			adjustSend = (adjustSend % 4) + 1
+			log("send " .. adjustSend)
+			paintAll()
 		else
-			doTransport("play")
+			enterAdjust("sends")
 		end
-		return
-	end
-	if cc == LEFT.record then
-		if shift then
-			doCaptureMidi()
+	elseif fn == "volume" or fn == "pan" then
+		if adjustMode == fn then
+			exitAdjust()
 		else
-			doTransport("record")
+			enterAdjust(fn)
 		end
-		return
-	end
-	if shift and cc == LEFT.fixedLength then
-		doAutomationFilterCycle()
-		return
-	end
-	if cc == LEFT.quantize then
-		doQuantize()
-		return
-	end
-	if cc == LEFT.duplicate then
-		clipOp = "duplicate"
-		clipOrigin = nil
-		log("clip op duplicate armed: press origin pad, then target pad")
-		paintAll()
-		return
-	end
-	if cc == LEFT.clear then
-		clipOp = "clear"
-		clipOrigin = nil
-		log("clip op clear armed: press the clip pad")
-		paintAll()
-		return
-	end
-	if cc == TOP.save then
-		if shift then
-			if pressSurfaceButton("save") then
-				log("save")
-			else
-				logOnce("save", "save unavailable: controlSurface.save missing")
-			end
-		else
-			log("projects: TODO")
-		end
-		return
-	end
-	local fn = TRACK_FN[cc]
-	if fn then
-		if shift then
-			doShiftFunction(fn)
-			paintTrack()
-			flushLEDs()
-		elseif fn == "sends" then
-			if adjustMode == "sends" then
-				adjustSend = (adjustSend % 4) + 1
-				log("send " .. adjustSend)
+	elseif fn == "device" then
+		if qlinkMode then
+			if qlinkPage == 0 and qlinkPageHasContent(1) then
+				qlinkPage = 1
+				log("qlink page 2")
 				paintAll()
 			else
-				enterAdjust("sends")
-			end
-		elseif fn == "volume" or fn == "pan" then
-			if adjustMode == fn then
-				exitAdjust()
-			else
-				enterAdjust(fn)
-			end
-		elseif fn == "device" then
-			if qlinkMode then
-				if qlinkPage == 0 and qlinkPageHasContent(1) then
-					qlinkPage = 1
-					log("qlink page 2")
-					paintAll()
-				else
-					exitQlink()
-				end
-			else
-				enterQlink()
+				exitQlink()
 			end
 		else
-			heldFunction = fn
-			adjustMode = nil
-			log("hold " .. fn)
-			paintAll()
+			enterQlink()
 		end
-		return
+	else
+		heldFunction = fn
+		adjustMode = nil
+		log("hold " .. fn)
+		paintAll()
 	end
-	if cc >= 101 and cc <= 108 then
-		local col = cc - 101
+end
+
+local function toggleFollow()
+	followMode = not followMode
+	log("follow: " .. (followMode and "on" or "off"))
+	if followMode then
+		followCurrentTrack(propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
+	else
+		paintTop()
+		flushLEDs()
+	end
+end
+
+local function logStatus()
+	log("status: mode=" .. mode .. " shift=" .. tostring(shift))
+end
+
+local function toggleProbe()
+	probeMode = not probeMode
+	log("probe mode " .. tostring(probeMode))
+	paintRight()
+	flushLEDs()
+end
+
+local function stepSeqNext()
+	if pressSurfaceButton("stepSeqNext") then
+		log("step seq: next")
+	else
+		logOnce("stepseqnext", "step seq next unavailable: controlSurface.stepSeqNext missing")
+	end
+end
+
+local function openStepSeq()
+	if pressSurfaceButton("stepSeq") then
+		setMode("step")
+		log("step seq view")
+	else
+		logOnce("stepseq", "step seq unavailable: controlSurface.stepSeq missing")
+	end
+end
+
+local function doSave()
+	if pressSurfaceButton("save") then
+		log("save")
+	else
+		logOnce("save", "save unavailable: controlSurface.save missing")
+	end
+end
+
+local function shiftPress()
+	shift = true
+	updateTapTempoRouting(true)
+	paintTop()
+	flushLEDs()
+end
+
+local function unmappedCustom()
+	logOnce("custom", "custom button: unmapped (capture MIDI lives on Shift + record)")
+end
+
+-- Plain press actions (Shift held: SHIFT_PRESS wins when it has an entry).
+local PRESS = {
+	[TOP.shift] = shiftPress,
+	[TOP.session] = function()
+		setMode("clip")
+	end,
+	[TOP.sequencer] = openStepSeq,
+	[TOP.note] = function()
+		togglePadsMode()
+		paintAll()
+	end,
+	[TOP.chord] = openPadPerformPage,
+	[TOP.custom] = unmappedCustom,
+	[TOP.left] = function()
+		moveWindow("left", 1)
+	end,
+	[TOP.right] = function()
+		moveWindow("right", 1)
+	end,
+	[TOP.save] = function()
+		log("projects: TODO")
+	end,
+	[RIGHT.logo] = logStatus,
+	[LEFT.up] = function()
+		ccUpDown(1)
+	end,
+	[LEFT.down] = function()
+		ccUpDown(-1)
+	end,
+	[LEFT.play] = function()
+		doTransport("play")
+	end,
+	[LEFT.record] = function()
+		doTransport("record")
+	end,
+	[LEFT.quantize] = doQuantize,
+	[LEFT.duplicate] = function()
+		armClipOp("duplicate")
+	end,
+	[LEFT.clear] = function()
+		armClipOp("clear")
+	end,
+}
+
+-- Shift-held actions.
+local SHIFT_PRESS = {
+	[TOP.session] = toggleFollow,
+	[TOP.sequencer] = stepSeqNext,
+	[TOP.note] = function()
+		doPluginPreset(false)
+	end,
+	[TOP.chord] = function()
+		doPluginPreset(true)
+	end,
+	[TOP.left] = function()
+		doTrackNav(false)
+	end,
+	[TOP.right] = function()
+		doTrackNav(true)
+	end,
+	[TOP.save] = doSave,
+	[RIGHT.logo] = toggleProbe,
+	[LEFT.play] = doLoopToggle,
+	[LEFT.record] = doCaptureMidi,
+	[LEFT.fixedLength] = doAutomationFilterCycle,
+}
+
+-- Scene buttons: launch the row, or its Shift label function.
+for row = 0, 7 do
+	local sceneRow = row
+	PRESS[SCENE[sceneRow + 1]] = function()
+		doScene(sceneRow)
+	end
+	SHIFT_PRESS[SCENE[sceneRow + 1]] = function()
+		handleRightLabel(sceneRow)
+	end
+end
+
+-- Function buttons CC 1-8 and the track row CC 101-108.
+for cc, fnName in pairs(TRACK_FN) do
+	local name = fnName
+	PRESS[cc] = function()
+		ccFunctionButton(name)
+	end
+end
+
+for cc = 101, 108 do
+	local col = cc - 101
+	PRESS[cc] = function()
 		local gc = globalPos(col, 0)
 		if heldFunction then
 			applyFunction(heldFunction, gc)
 		else
 			selectTrack(col, gc)
 		end
+	end
+end
+
+function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
+	if channel ~= 0 then
+		return
+	end
+	if probeMode then
+		probe(nil, cc, value)
+		return
+	end
+	if value == 0 then
+		ccRelease(cc)
+		return
+	end
+	local action = (shift and SHIFT_PRESS[cc]) or PRESS[cc]
+	if action then
+		action()
 		return
 	end
 	log("unmapped CC " .. cc .. " value " .. value)

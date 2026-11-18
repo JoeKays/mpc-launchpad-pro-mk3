@@ -9,7 +9,7 @@ mock.mpc.clipMatrix = nil
 mock.mpc.sequencer = nil
 mock.mpc.commandManager = nil
 _G.LaunchpadProMK3 = mock.dev
-dofile("script/LaunchpadProMK3.lua")
+dofile(os.getenv("LPP3_LUA") or "script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 L.OnLoad()
 L.HandleMIDINoteOn(0, 11, 100)

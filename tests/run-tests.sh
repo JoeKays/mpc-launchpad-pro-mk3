@@ -21,4 +21,15 @@ for t in tests/test-*.lua; do
   lua5.4 "$t"
 done
 
+# The shipped artifact is the minified Lua: the whole suite must pass on it too.
+echo "== minified artifact (the deployed form) =="
+MIN_ARTIFACT="$(mktemp)"
+tools/minify-lua.sh script/LaunchpadProMK3.lua > "$MIN_ARTIFACT"
+luac5.4 -p "$MIN_ARTIFACT"
+for t in tests/test-*.lua; do
+  LPP3_LUA="$MIN_ARTIFACT" lua5.4 "$t" >/dev/null
+done
+rm -f "$MIN_ARTIFACT"
+echo "minified artifact: OK"
+
 echo "ALL TESTS PASS"
