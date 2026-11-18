@@ -82,6 +82,7 @@ track navigation, plugin presets and the firmware probe are implemented and host
 
 | Path | What |
 |---|---|
+| `docs/MANUAL.md` | generated quick reference (all controls, pages, colours); regenerate with `tools/gen-manual.sh` |
 | `docs/API-CONTRACT.md` | the MPC 3.10.1 Lua API surface this script relies on |
 | `docs/LPP3-LAYOUT.md` | Launchpad Pro MK3 Programmer-mode note/CC map + LED protocol |
 | `docs/PATTERNS.md` | reusable patterns from the reference controllers |

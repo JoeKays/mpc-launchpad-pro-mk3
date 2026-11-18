@@ -27,6 +27,9 @@ MPC binary; read it from your own copy, never publish it.
 - `./tests/run-tests.sh` — `luac5.4 -p`, the ini regression gate (`tools/check-ini.sh`),
   `selene` (if present), and the mock tests.
 - `selene` and `stylua` are optional; set `SELENE` to your selene binary.
+- `tools/gen-manual.sh` regenerates `docs/MANUAL.md` from the script's `ACTIONS`
+  table; `tools/gen-manual.sh --check` (run by `tests/run-tests.sh`) fails when the
+  committed manual is stale. Edit the script, then regenerate — never edit the manual.
 - **Enable the pre-commit gate once per clone:**
   `git config core.hooksPath .githooks` — it blocks `.ini` regressions that the
   MPC loader refuses silently (no log, no load) and lua syntax errors. The same

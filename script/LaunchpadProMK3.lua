@@ -91,6 +91,46 @@ local TRACK_FN = {
 }
 local SCENE = { 89, 79, 69, 59, 49, 39, 29, 19 }
 
+-- Reference data for the generated manual (docs/MANUAL.md, tools/gen-manual.lua).
+-- Every CC that the dispatch tables handle must have an entry here; a test
+-- enforces that both directions stay complete.
+local ACTIONS = {
+	[90] = { label = "Shift", plain = "hold for the shift functions", shift = "-" },
+	[91] = { label = "Left", plain = "move the clip window left", shift = "previous track" },
+	[92] = { label = "Right", plain = "move the clip window right", shift = "next track" },
+	[93] = { label = "Session", plain = "clip grid (leaves every page)", shift = "toggle follow-current-track" },
+	[94] = { label = "Note", plain = "MPC pads mode (layout from the track type)", shift = "previous plugin preset" },
+	[95] = { label = "Chord", plain = "open the MPC Pad Perform page", shift = "next plugin preset" },
+	[96] = { label = "Custom", plain = "unmapped stub", shift = "unmapped stub" },
+	[97] = { label = "Sequencer", plain = "open the MPC step sequencer view", shift = "step sequencer: next bar" },
+	[98] = { label = "Projects", plain = "unmapped stub", shift = "save" },
+	[99] = { label = "Logo", plain = "log the current mode", shift = "probe mode (log every incoming message)" },
+	[89] = { label = "Patterns", plain = "launch scene 1", shift = "scene 1 label function" },
+	[79] = { label = "Steps", plain = "launch scene 2", shift = "scene 2 label function" },
+	[69] = { label = "Pattern settings", plain = "launch scene 3", shift = "scene 3 label function" },
+	[59] = { label = "Velocity", plain = "launch scene 4", shift = "scene 4 label function" },
+	[49] = { label = "Probability", plain = "launch scene 5", shift = "scene 5 label function" },
+	[39] = { label = "Mutation", plain = "launch scene 6", shift = "scene 6 label function" },
+	[29] = { label = "Micro step", plain = "launch scene 7", shift = "scene 7 label function" },
+	[19] = { label = "Print to clip", plain = "launch scene 8", shift = "scene 8 label function" },
+	[10] = { label = "Record", plain = "arm / disarm recording", shift = "overdub" },
+	[20] = { label = "Play", plain = "play / stop", shift = "loop on / off" },
+	[30] = { label = "Fixed length", plain = "unmapped stub", shift = "cycle the automation filter" },
+	[40] = { label = "Quantize", plain = "apply quantize", shift = "apply quantize" },
+	[50] = { label = "Duplicate", plain = "hold: duplicate clip (origin, then target)", shift = "hold: duplicate clip" },
+	[60] = { label = "Clear", plain = "hold: clear clip", shift = "hold: clear clip" },
+	[70] = { label = "Down", plain = "window down / page value down", shift = "window down by 8" },
+	[80] = { label = "Up", plain = "window up / page value up", shift = "window up by 8" },
+	[1] = { label = "Rec arm", plain = "hold + track: record arm", shift = "undo" },
+	[2] = { label = "Mute", plain = "hold + track: mute", shift = "redo" },
+	[3] = { label = "Solo", plain = "hold + track: solo", shift = "-" },
+	[4] = { label = "Volume", plain = "volume menu", shift = "-" },
+	[5] = { label = "Pan", plain = "pan menu", shift = "-" },
+	[6] = { label = "Sends", plain = "sends menu (repeat: next send)", shift = "tap tempo" },
+	[7] = { label = "Device", plain = "Q-Link page (repeat: page 2, then exit)", shift = "tempo page" },
+	[8] = { label = "Stop clip", plain = "hold + track: stop the track's clips", shift = "swing page" },
+}
+
 -- Clip state enum (order confirmed by the stock MPK script and mpc-3-ce Gen1 enum)
 local S = {
 	NoSlot = 0,
@@ -2602,6 +2642,10 @@ for cc = 101, 108 do
 		end
 	end
 end
+
+-- Reference data for the generated manual (docs/MANUAL.md).
+LaunchpadProMK3.ACTIONS = ACTIONS
+LaunchpadProMK3.PALETTE = C
 
 function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	if channel ~= 0 then

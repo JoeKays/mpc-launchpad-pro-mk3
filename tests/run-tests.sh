@@ -10,6 +10,9 @@ echo "luac: OK"
 echo "== check-ini (loader regression gate) =="
 tools/check-ini.sh script/LaunchpadProMK3.ini.in template
 
+echo "== generated manual =="
+tools/gen-manual.sh --check
+
 SELENE="${SELENE:-$(command -v selene || true)}"
 if [ -n "$SELENE" ] && [ -x "$SELENE" ]; then
   echo "== selene =="
