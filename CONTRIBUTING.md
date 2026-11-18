@@ -24,8 +24,14 @@ MPC binary; read it from your own copy, never publish it.
 
 ## Tests
 
-- `./tests/run-tests.sh` — `luac5.4 -p`, `selene` (if present), and the mock tests.
+- `./tests/run-tests.sh` — `luac5.4 -p`, the ini regression gate (`tools/check-ini.sh`),
+  `selene` (if present), and the mock tests.
 - `selene` and `stylua` are optional; set `SELENE` to your selene binary.
+- **Enable the pre-commit gate once per clone:**
+  `git config core.hooksPath .githooks` — it blocks `.ini` regressions that the
+  MPC loader refuses silently (no log, no load) and lua syntax errors. The same
+  gate also runs inside `script/build.sh` and `tests/run-tests.sh`, so builds and
+  tests fail loudly even in clones without the hook installed.
 
 ## Device
 
