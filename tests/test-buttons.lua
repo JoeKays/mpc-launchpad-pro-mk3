@@ -190,6 +190,16 @@ mock.sequencer.OverdubState:set(false)
 assert_eq(mock.leds[20][1], 12, "play button dim with loop off, stopped")
 assert_eq(mock.leds[10][1], 12, "record button dim with overdub off")
 
+-- RecordState on the device is a NUMBER (0 = off) and Lua treats 0 as true:
+-- an unarmed record button must stay dim, an armed one red.
+mock.sequencer.RecordState:set(0)
+assert_eq(mock.leds[10][1], 12, "record button dim with numeric RecordState 0")
+assert_eq(mock.leds[10][2], 12, "record button dim g with numeric RecordState 0")
+mock.sequencer.RecordState:set(1)
+assert_eq(mock.leds[10][1], 127, "record button red with numeric RecordState 1")
+assert_eq(mock.leds[10][2], 0, "record button red g with numeric RecordState 1")
+mock.sequencer.RecordState:set(false)
+
 -- Shift + CC 93 toggles follow mode (off by default).
 local function logHas(s)
 	for _, l in ipairs(logs) do

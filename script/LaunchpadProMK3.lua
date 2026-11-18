@@ -211,6 +211,12 @@ local function propValue(obj, name)
 	return nil
 end
 
+-- Boolean view of a property value. MPC state properties such as RecordState
+-- are numbers (0 = off), and Lua treats 0 as true — never test them directly.
+local function truthy(v)
+	return v ~= nil and v ~= false and v ~= 0
+end
+
 -- Safe accessor: the member when it exists with the expected type, else nil.
 -- mpc.* objects are sol2 tables/userdata; a missing build field must never raise.
 local function member(obj, key, kind)
@@ -1228,10 +1234,10 @@ end
 
 local function paintLeft()
 	local sq = mpc.sequencer
-	local playing = sq and call(sq.IsPlaying) or propValue(sq, "Playing")
-	local recording = propValue(sq, "RecordState")
-	local overdub = propValue(sq, "OverdubState")
-	local loop = propValue(sq, "Loop")
+	local playing = truthy(sq and call(sq.IsPlaying) or propValue(sq, "Playing"))
+	local recording = truthy(propValue(sq, "RecordState"))
+	local overdub = truthy(propValue(sq, "OverdubState"))
+	local loop = truthy(propValue(sq, "Loop"))
 	-- play: green while playing, orange while loop is enabled, dim otherwise
 	if playing then
 		ledCol(LEFT.play, C.green)
@@ -2047,11 +2053,7 @@ end
 -- triggered), the next press disarms. Delegates to controlSurface.record so the
 -- MPC's record state machine does the work; falls back to Record/RecordOff.
 local function recordArmed()
-	local st = propValue(mpc.sequencer, "RecordState")
-	if type(st) == "number" then
-		return st ~= 0
-	end
-	return st == true
+	return truthy(propValue(mpc.sequencer, "RecordState"))
 end
 
 local function doRecordToggle()
