@@ -528,6 +528,14 @@ local mpc = {
 				record("fullLevel.Release")
 			end,
 		},
+		keyboardControl = {
+			Press = function()
+				record("keyboardControl.Press")
+			end,
+			Release = function()
+				record("keyboardControl.Release")
+			end,
+		},
 		stepSeq = {
 			Press = function()
 				record("stepSeq.Press")

@@ -24,7 +24,8 @@
 --                        59 velocity, 49 probability, 39 mutation, 29 micro step, 19 print to clip
 --   top row CC 90-98     90 shift, 91 < (Shift = track prev), 92 > (Shift = track next),
 --                        93 session (clip grid), 94 note = MPC pads mode (Shift = preset prev),
---                        95 chord (Shift = preset next), 96 custom = track mute mode,
+--                        95 chord = MPC Keyboard page, key/scale (Shift = preset next),
+--                        96 custom = track mute mode,
 --                        97 sequencer, 98 projects/save
 --   left column CC 10-80 10 record (Shift = overdub), 20 play (Shift = loop toggle),
 --                        30 fixed length (Shift = automation filter cycle),
@@ -157,7 +158,7 @@ local qlinkCol = 0 -- last grid column touched (for Shift+up/down nudges)
 local followMode = false -- optional grid-follows-current-track; Shift+CC 93 toggles
 local padsMode = false -- CC94 MPC pads mode: the grid quadrant mirrors mpc.controlSurface.pads
 local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
-local padUtility = "off" -- CC 95 cycles the MPC's pad utilities: note repeat -> full level -> off
+local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or pads64 (all four banks)
 local boundPadNotes = {} -- grid notes currently routed away from the script
 local chromaticVirtualPad -- forward declaration (defined with the pad-mode helpers)
@@ -1147,7 +1148,7 @@ local function paintTrack()
 	end
 end
 
-local padUtilityAvailable -- forward declaration (defined with the pad-mode helpers)
+local padsLayoutAvailable -- forward declaration (defined with the pad-mode helpers)
 local padsLayoutAvailable -- forward declaration (defined with the pad-mode helpers)
 
 local function paintTop()
@@ -1167,12 +1168,7 @@ local function paintTop()
 	elseif padsLayoutAvailable() then
 		note = C.available
 	end
-	local chord = C.off
-	if padsMode and padUtility ~= "off" then
-		chord = C.white
-	elseif padsMode and padUtilityAvailable() then
-		chord = C.available
-	end
+	local chord = C.available -- opens the MPC's Keyboard page (key/scale) on press
 	local custom = C.off -- stub (mutes live on the CC 2 hold-function)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
@@ -1439,11 +1435,9 @@ local function padsModeNote(i)
 end
 
 -- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
--- The MPC's pad utilities are toggled by pressing the control-surface buttons; CC 95
--- cycles them while MPC Pads mode owns the grid. keyboardControl is deliberately NOT
--- in the cycle: it opens the MPC's Keyboard page (on-screen keyboard + settings)
--- rather than silently toggling a pad mode.
-local PAD_UTILITY_BUTTONS = { noteRepeat = "noteRepeat", fullLevel = "fullLevel" }
+-- pressSurfaceButton drives the MPC's own control-surface buttons. CC 95 (chord)
+-- opens the MPC's Keyboard page — the on-screen page that carries the key and
+-- scale selection (plus chords settings) — via controlSurface.keyboardControl.
 
 local function pressSurfaceButton(name)
 	local b = mpc.controlSurface and mpc.controlSurface[name]
@@ -1453,14 +1447,6 @@ local function pressSurfaceButton(name)
 		return true
 	end
 	return false
-end
-
-padUtilityAvailable = function()
-	local cs = mpc.controlSurface
-	if not (cs and cs.noteRepeat and cs.fullLevel) then
-		return false
-	end
-	return true
 end
 
 padsLayoutAvailable = function()
@@ -1474,36 +1460,14 @@ padsLayoutAvailable = function()
 	return type(pads.AddNoteToMpcPad) == "function"
 end
 
-local function clearPadUtility()
-	if padUtility ~= "off" then
-		pressSurfaceButton(PAD_UTILITY_BUTTONS[padUtility])
-		padUtility = "off"
-	end
-end
-
-local function cyclePadUtility()
-	if not padsMode then
-		logOnce("padutility", "pad modes: enter MPC pads mode (CC 94) first")
-		return
-	end
-	if not padUtilityAvailable() then
-		logOnce("padutility", "pad modes unavailable: controlSurface buttons missing")
-		return
-	end
-	if padUtility == "off" then
-		pressSurfaceButton("noteRepeat")
-		padUtility = "noteRepeat"
-	elseif padUtility == "noteRepeat" then
-		pressSurfaceButton("noteRepeat") -- off
-		pressSurfaceButton("fullLevel")
-		padUtility = "fullLevel"
+local function openKeyboardPage()
+	-- Opens the MPC's Keyboard page: on-screen keyboard with the KEY and SCALE
+	-- selection (and the chords settings) — select key/scale on the MPC screen.
+	if pressSurfaceButton("keyboardControl") then
+		log("keyboard page (key/scale) open on MPC")
 	else
-		pressSurfaceButton("fullLevel") -- off
-		padUtility = "off"
+		logOnce("keypage", "keyboardControl unavailable on this MPC")
 	end
-	log("pad utility: " .. padUtility)
-	paintTop()
-	flushLEDs()
 end
 
 local function exitPadsMode()
@@ -1511,7 +1475,6 @@ local function exitPadsMode()
 		return
 	end
 	padsMode = false
-	clearPadUtility()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
 	for _, b in ipairs(boundPadNotes) do
@@ -2299,7 +2262,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.chord then
-		cyclePadUtility()
+		openKeyboardPage()
 		return
 	end
 	if cc == TOP.note then
@@ -2585,7 +2548,6 @@ function LaunchpadProMK3.OnLoad()
 	followMode = false
 	padsMode = false
 	padsLayout = "drum"
-	padUtility = "off"
 	padsColourCache = {}
 	clipOp = nil
 	clipOrigin = nil

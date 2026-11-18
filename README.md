@@ -69,7 +69,7 @@ track navigation, plugin presets and the firmware probe are implemented and host
   pads, row-major banks A-H, matching MPC 3.10.1's native 8x8 64 Pads mode); CC 93
   also exits at any point.
 - **Modes**: 93 session = clip (Shift = toggle follow), 94 note = MPC pads mode,
-  95 chord = cycles the MPC's keyboard/chord pad modes inside pads mode, 96 custom =
+  95 chord = opens the MPC's Keyboard page (key/scale selection on screen), 96 custom =
   stub, 97 sequencer = opens the MPC step seq view (Shift = next bar); Shift + 98 =
   save; Shift + right-column 89/79/69 = clip/step/track modes.
   Pad modes, fader menus and tempo/swing pages are mutually exclusive.

@@ -282,7 +282,7 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 92 | > | window right (`MoveRight`); Shift = next track (`currentTrack.Next`) |
 | 93 | session | clip mode; Shift = toggle follow-current-track (off by default). LED: cyan while follow is on |
 | 94 | note | MPC pads mode: the bottom-left 4x4 quadrant mirrors the MPC pad colours and plays the MPC pads; press again to exit. Shift = previous plugin preset (`currentTrack.PrevPluginPreset`) |
-| 95 | chord | cycles the MPC's pad utilities while MPC Pads mode is open: off -> note repeat -> full level -> off (via `controlSurface.noteRepeat`/`fullLevel`); Shift = next plugin preset (`currentTrack.NextPluginPreset`). Note: the MPC's chromatic Keyboard mode is a full screen page (`controlSurface.keyboardControl`), not a silent toggle |
+| 95 | chord | opens the MPC's **Keyboard page** on screen — the page carrying the KEY and SCALE selection (plus chords settings) — via `controlSurface.keyboardControl`; works inside and outside pads mode; Shift = next plugin preset (`currentTrack.NextPluginPreset`) |
 | 96 | custom | stub (track mutes live on the CC 2 hold-function) |
 | 97 | sequencer | opens the MPC's step sequencer view (`controlSurface.stepSeq`); Shift = next bar (`controlSurface.stepSeqNext`) |
 | 98 | projects/save | projects (stub); Shift = save (`controlSurface.save`) |
