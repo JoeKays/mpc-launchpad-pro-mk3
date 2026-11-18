@@ -294,7 +294,7 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 10 | record | press = arm/disarm recording via the MPC's own REC button (`controlSurface.record`; recording starts when the transport runs); Shift = overdub (`sequencer.Overdub`). LED: red while armed/recording, orange while overdubbing |
 | 20 | play | `IsPlaying` ? `Stop` : `Play`; Shift = loop toggle (`sequencer.Loop.value`). LED: green while playing, orange while loop is enabled, dim when stopped |
 | 30 | fixed length | stub; Shift = cycle the global automation filter (`project.AdvanceGlobalAutomationFilterType`) |
-| 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()` |
+| 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()`; LED cyan while `sequencer.quantiser.Enabled` is on, white while available and off, off when quantizeApply is missing |
 | 50 | duplicate/double | hold duplicate, press the origin clip pad, then one or more target clip pads (`clipMatrix.CopyClip`) |
 | 60 | clear | hold clear, press one or more clip pads (`clipMatrix.DeleteClip`) |
 | 70 | down | window down (`MoveDown`); Shift = 8 |

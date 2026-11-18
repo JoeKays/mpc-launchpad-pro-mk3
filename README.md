@@ -36,7 +36,8 @@ track navigation, plugin presets and the firmware probe are implemented and host
   button; recording starts when the transport runs); Shift + CC 1/2 = undo/redo,
   Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle.
   The play LED shows loop state (green playing, orange loop armed) and the record LED
-  shows the record state (dim unarmed, red armed/recording, orange overdubbing).
+  shows the record state (dim unarmed, red armed/recording, orange overdubbing). The
+  quantize LED is cyan while the quantiser is on and white while it is off.
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
   Shift + < / > (CC 91/92) = previous/next track; Shift + note/chord (CC 94/95) =
   previous/next plugin preset on the current track.

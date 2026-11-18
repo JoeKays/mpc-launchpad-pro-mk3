@@ -501,6 +501,19 @@ local mpc = {
 		SizeNormalTracks = function()
 			return normalTrackCount
 		end,
+		GetCount = function()
+			return normalTrackCount
+		end,
+	},
+	currentSequence = {
+		GetBPM = function()
+			return mockBpm
+		end,
+		SetBPM = function(bpm)
+			record("SetBPM", bpm)
+			mockBpm = bpm
+		end,
+		events = {},
 	},
 	sequencer = sequencer,
 	commandManager = commandManager,

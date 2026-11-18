@@ -115,6 +115,29 @@ L.HandleMIDICC(0, 40, 127) -- quantize applies (no Shift variant)
 assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "quantize applied")
 L.HandleMIDICC(0, 40, 0)
 
+-- No project: project-scoped actions refuse with a log instead of calling into
+-- the MPC (an empty project with 0 tracks must still work).
+local savedSeq, savedTracks = mock.mpc.currentSequence, mock.mpc.tracks
+local savedGetBPM = mock.sequencer.GetBPM
+mock.mpc.currentSequence = nil
+mock.mpc.tracks = nil
+mock.sequencer.GetBPM = nil
+local beforeQ = mock.count("quantizeApply.Press")
+L.HandleMIDICC(0, 40, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: quantize: no project loaded", "quantize guarded without a project")
+assert_eq(mock.count("quantizeApply.Press"), beforeQ, "quantizeApply not pressed without a project")
+L.HandleMIDICC(0, 40, 0)
+-- empty project (0 tracks) is still a project: quantize runs
+mock.mpc.currentSequence = savedSeq
+mock.mpc.tracks = savedTracks
+mock.mpc.tracks.GetCount = function()
+	return 0
+end
+mock.sequencer.GetBPM = savedGetBPM
+L.HandleMIDICC(0, 40, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "empty project still quantizes")
+L.HandleMIDICC(0, 40, 0)
+
 L.HandleMIDICC(0, 30, 127) -- shift + fixed length = automation filter cycle
 assert_eq(mock.count("AdvanceGlobalAutomationFilterType"), 1, "filter cycle called")
 assert_eq(lastLog(), "LaunchpadProMK3: automation filter: cycled", "automation filter logged")
@@ -198,6 +221,16 @@ mock.sequencer.RecordState:set(1)
 assert_eq(mock.leds[10][1], 127, "record button red with numeric RecordState 1")
 assert_eq(mock.leds[10][2], 0, "record button red g with numeric RecordState 1")
 mock.sequencer.RecordState:set(false)
+
+-- Quantize LED: cyan when the quantiser is on, white when available but off.
+mock.sequencer.quantiser.Enabled:set(true)
+assert_eq(mock.leds[40][1], 0, "quantize cyan r while quantiser on")
+assert_eq(mock.leds[40][2], 127, "quantize cyan g while quantiser on")
+assert_eq(mock.leds[40][3], 127, "quantize cyan b while quantiser on")
+mock.sequencer.quantiser.Enabled:set(false)
+assert_eq(mock.leds[40][1], 127, "quantize white while quantiser off")
+assert_eq(mock.leds[40][2], 127, "quantize white g while quantiser off")
+mock.sequencer.quantiser.Enabled:set(true)
 
 -- Shift + CC 93 toggles follow mode (off by default).
 local function logHas(s)

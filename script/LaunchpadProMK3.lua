@@ -248,6 +248,36 @@ local function trackAction(field, logKey, label)
 	return true
 end
 
+-- Is a project loaded? Several independent indicators, because no single one is
+-- reliable: an empty project legitimately has 0 tracks, so the track count is
+-- NOT an indicator. The MPC's native side dereferences project state and can
+-- crash hard (a native abort that pcall cannot catch), so this guard is
+-- preventive. Any one positive indicator counts as "loaded" — a false positive
+-- only re-enables an action, a false negative would disable a working one.
+local function projectLoaded()
+	if mpc.currentSequence ~= nil then
+		return true
+	end
+	local tracks = mpc.tracks
+	if tracks ~= nil and tracks.currentTrack ~= nil then
+		return true
+	end
+	local bpm = call(callable(mpc.sequencer, "GetBPM"))
+	if type(bpm) == "number" and bpm > 0 then
+		return true
+	end
+	return false
+end
+
+-- Guard for project-scoped actions: true when safe to run, else a one-time log.
+local function requireProject(label)
+	if projectLoaded() then
+		return true
+	end
+	logOnce(label .. "-noproject", label .. ": no project loaded")
+	return false
+end
+
 local function clamp01(v)
 	v = tonumber(v) or 0
 	if v < 0 then
@@ -1232,6 +1262,11 @@ local function paintTop()
 	)
 end
 
+-- Quantiser on/off is a project setting (sequencer.quantiser.Enabled).
+local function quantiserEnabled()
+	return truthy(propValue(mpc.sequencer and mpc.sequencer.quantiser, "Enabled"))
+end
+
 local function paintLeft()
 	local sq = mpc.sequencer
 	local playing = truthy(sq and call(sq.IsPlaying) or propValue(sq, "Playing"))
@@ -1256,12 +1291,13 @@ local function paintLeft()
 	end
 	ledOff(LEFT.fixedLength)
 	local quantizeAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.quantizeApply ~= nil
-	ledRGB(
-		LEFT.quantize,
-		quantizeAvailable and C.white[1] or C.off[1],
-		quantizeAvailable and C.white[2] or C.off[2],
-		quantizeAvailable and C.white[3] or C.off[3]
-	)
+	if not quantizeAvailable then
+		ledCol(LEFT.quantize, C.off)
+	elseif quantiserEnabled() then
+		ledCol(LEFT.quantize, C.cyan) -- quantiser is on
+	else
+		ledCol(LEFT.quantize, C.white) -- available, quantiser off
+	end
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
 	local pageColour = tempoMode and C.white
 		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or adjustColour()))
@@ -1427,6 +1463,7 @@ local function listenAll()
 		listen(sq.RecordState, repaint)
 		listen(sq.OverdubState, repaint)
 		listen(sq.Loop, repaint)
+		listen(sq.quantiser and sq.quantiser.Enabled, repaint)
 	end
 	local ct = mpc.tracks and mpc.tracks.currentTrack
 	if ct then
@@ -1769,6 +1806,9 @@ local function setTrackVolumeDB(idx, db)
 end
 
 local function changeTempo(delta)
+	if not requireProject("tempo") then
+		return
+	end
 	local sq = mpc.sequencer
 	local bpm = call(sq and sq.GetBPM) or 120
 	bpm = math.max(20, math.min(300, math.floor(bpm + delta + 0.5)))
@@ -1780,6 +1820,9 @@ local function changeTempo(delta)
 end
 
 local function changeSwing(delta)
+	if not requireProject("swing") then
+		return
+	end
 	local q = mpc.sequencer and mpc.sequencer.quantiser
 	-- MPC swing: 50% = straight, > 50 delays every other step; 75% is the max
 	local swing = call(q and q.GetSwing) or 50
@@ -1792,6 +1835,9 @@ local function changeSwing(delta)
 end
 
 local function doQuantize()
+	if not requireProject("quantize") then
+		return
+	end
 	local press = callable(mpc.controlSurface and mpc.controlSurface.quantizeApply, "Press")
 	if press then
 		call(press)
@@ -2032,6 +2078,9 @@ local function doShiftFunction(fn)
 end
 
 local function doTransport(fn)
+	if not requireProject("transport") then
+		return
+	end
 	local sq = mpc.sequencer
 	if fn == "play" then
 		local playing = sq and call(sq.IsPlaying) or propValue(sq, "Playing")
@@ -2057,6 +2106,9 @@ local function recordArmed()
 end
 
 local function doRecordToggle()
+	if not requireProject("record") then
+		return
+	end
 	local armed = recordArmed()
 	if pressSurfaceButton("record") then
 		log("record: " .. (armed and "disarmed" or "armed"))
@@ -2074,6 +2126,9 @@ end
 
 -- Shift + play (CC 20): loop on/off (Loop is a userdata property with .value).
 local function doLoopToggle()
+	if not requireProject("loop") then
+		return
+	end
 	local sq = mpc.sequencer
 	local loop = propValue(sq, "Loop")
 	if not sq or sq.Loop == nil then
@@ -2104,6 +2159,9 @@ end
 
 -- Shift + fixed length (CC 30): cycle the global automation filter type.
 local function doAutomationFilterCycle()
+	if not requireProject("automation filter") then
+		return
+	end
 	local f = callable(mpc.project, "AdvanceGlobalAutomationFilterType")
 	if not f then
 		logOnce("autofilter", "automation filter unavailable: project.AdvanceGlobalAutomationFilterType missing")
@@ -2373,6 +2431,9 @@ local function stepSeqNext()
 end
 
 local function openStepSeq()
+	if not requireProject("step seq") then
+		return
+	end
 	if pressSurfaceButton("stepSeq") then
 		setMode("step")
 		log("step seq view")
@@ -2382,6 +2443,9 @@ local function openStepSeq()
 end
 
 local function doSave()
+	if not requireProject("save") then
+		return
+	end
 	if pressSurfaceButton("save") then
 		log("save")
 	else
