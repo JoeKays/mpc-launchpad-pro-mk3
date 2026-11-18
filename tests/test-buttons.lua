@@ -172,6 +172,8 @@ L.HandleMIDICC(0, 40, 0)
 L.OnLoad() -- fresh paint: clears the LED cache so every colour is sent once
 assert_eq(mock.leds[93][1], 127, "session white with a project")
 assert_eq(mock.leds[50][1], 127, "duplicate white with a project")
+assert_eq(mock.leds[91][1], 127, "left white with a project")
+assert_eq(mock.leds[92][1], 127, "right white with a project")
 mock.mpc.engineMode.CurrentPopup:set("New Project")
 L.HandleMIDICC(0, 90, 127) -- repaint the top row with the dialog open
 mock.sequencer.Loop:set(false) -- repaint the left column
@@ -182,6 +184,8 @@ assert_eq(mock.leds[50][1], 0, "duplicate off without a project")
 assert_eq(mock.leds[60][1], 0, "clear off without a project")
 assert_eq(mock.leds[70][1], 0, "down off without a project")
 assert_eq(mock.leds[80][1], 0, "up off without a project")
+assert_eq(mock.leds[91][1], 0, "left off without a project")
+assert_eq(mock.leds[92][1], 0, "right off without a project")
 mock.mpc.engineMode.CurrentPopup:set("No Popup")
 
 L.HandleMIDICC(0, 30, 127) -- shift + fixed length = automation filter cycle

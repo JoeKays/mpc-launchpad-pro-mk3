@@ -1279,8 +1279,11 @@ local function paintTop()
 	ledCol(TOP.note, note)
 	ledCol(TOP.chord, chord)
 	ledCol(TOP.custom, custom)
-	ledCol(TOP.left, C.dim)
-	ledCol(TOP.right, C.dim)
+	-- left/right match the up/down arrows: white while available, off without a
+	-- project (the arrows are window/track navigation, not page controls)
+	local arrows = projectOn and C.white or C.off
+	ledCol(TOP.left, arrows)
+	ledCol(TOP.right, arrows)
 	local saveAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.save ~= nil
 	if not projectOn then
 		ledCol(TOP.save, C.off)
