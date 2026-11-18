@@ -172,21 +172,23 @@ local lastLog = {}
 -- Utilities
 -----------------------------------------------------------------------------------------------
 
-local function log(msg)
+local H = {}
+
+function H.log(msg)
 	pcall(function()
 		print(deviceName .. ": " .. tostring(msg))
 	end)
 end
 
-local function logOnce(key, msg)
+function H.logOnce(key, msg)
 	if lastLog[key] then
 		return
 	end
 	lastLog[key] = true
-	log(msg)
+	H.log(msg)
 end
 
-local function call(f, ...)
+function H.call(f, ...)
 	if type(f) ~= "function" then
 		return nil
 	end
@@ -197,7 +199,7 @@ local function call(f, ...)
 	return nil
 end
 
-local function propValue(obj, name)
+function H.propValue(obj, name)
 	local p = obj and obj[name]
 	if p == nil then
 		return nil
@@ -213,13 +215,13 @@ end
 
 -- Boolean view of a property value. MPC state properties such as RecordState
 -- are numbers (0 = off), and Lua treats 0 as true — never test them directly.
-local function truthy(v)
+function H.truthy(v)
 	return v ~= nil and v ~= false and v ~= 0
 end
 
 -- Safe accessor: the member when it exists with the expected type, else nil.
 -- mpc.* objects are sol2 tables/userdata; a missing build field must never raise.
-local function member(obj, key, kind)
+function H.member(obj, key, kind)
 	if obj == nil then
 		return nil
 	end
@@ -230,21 +232,21 @@ local function member(obj, key, kind)
 	return nil
 end
 
--- Shorthand for member(obj, key, "function"): the callable, or nil.
-local function callable(obj, key)
-	return member(obj, key, "function")
+-- Shorthand for H.member(obj, key, "function"): the callable, or nil.
+function H.callable(obj, key)
+	return H.member(obj, key, "function")
 end
 
 -- Call currentTrack.<field>() with a one-time log when the build lacks it.
 -- Returns true when the action ran.
-local function trackAction(field, logKey, label)
+function H.trackAction(field, logKey, label)
 	local ct = mpc.tracks and mpc.tracks.currentTrack
-	local f = callable(ct, field)
+	local f = H.callable(ct, field)
 	if not f then
-		logOnce(logKey, label .. " unavailable: currentTrack." .. field .. " missing")
+		H.logOnce(logKey, label .. " unavailable: currentTrack." .. field .. " missing")
 		return false
 	end
-	call(f)
+	H.call(f)
 	return true
 end
 
@@ -254,7 +256,28 @@ end
 -- crash hard (a native abort that pcall cannot catch), so this guard is
 -- preventive. Any one positive indicator counts as "loaded" — a false positive
 -- only re-enables an action, a false negative would disable a working one.
-local function projectLoaded()
+-- Name of the current popup: "No Popup" (or empty) when none is open — the MPC
+-- binary documents the property as "The name of the current popup, or empty if
+-- there is no popup". Project-scoped native actions crash while a dialog owns
+-- the UI (e.g. the New Project page), so an open popup blocks them.
+function H.currentPopup()
+	local em = mpc.engineMode
+	local p = H.propValue(em, "CurrentPopup")
+	if p == nil then
+		p = H.call(H.callable(em, "GetCurrentPopup"))
+	end
+	return tostring(p or "")
+end
+
+function H.popupOpen()
+	local p = H.currentPopup()
+	return p ~= "" and p ~= "No Popup"
+end
+
+function H.projectLoaded()
+	if H.popupOpen() then
+		return false
+	end
 	if mpc.currentSequence ~= nil then
 		return true
 	end
@@ -262,7 +285,7 @@ local function projectLoaded()
 	if tracks ~= nil and tracks.currentTrack ~= nil then
 		return true
 	end
-	local bpm = call(callable(mpc.sequencer, "GetBPM"))
+	local bpm = H.call(H.callable(mpc.sequencer, "GetBPM"))
 	if type(bpm) == "number" and bpm > 0 then
 		return true
 	end
@@ -270,15 +293,19 @@ local function projectLoaded()
 end
 
 -- Guard for project-scoped actions: true when safe to run, else a one-time log.
-local function requireProject(label)
-	if projectLoaded() then
+function H.requireProject(label)
+	if H.projectLoaded() then
 		return true
 	end
-	logOnce(label .. "-noproject", label .. ": no project loaded")
+	if H.popupOpen() then
+		H.logOnce(label .. "-popup", label .. ": dialog open (" .. H.currentPopup() .. ")")
+	else
+		H.logOnce(label .. "-noproject", label .. ": no project loaded")
+	end
 	return false
 end
 
-local function clamp01(v)
+function H.clamp01(v)
 	v = tonumber(v) or 0
 	if v < 0 then
 		return 0
@@ -289,7 +316,7 @@ local function clamp01(v)
 end
 
 -- Nearest volume-fader row (0 = top, 7 = bottom) for a dB value.
-local function dbToRow(db)
+function H.dbToRow(db)
 	db = tonumber(db)
 	if db == nil or db <= -60 then
 		return 7
@@ -311,7 +338,7 @@ end
 
 -- MPC volume fader curve, measured on 3.10.1: dB = 40*log10(gain) + 6.
 -- Inverse: gain = 10^((dB - 6) / 40); -inf is gain 0.
-local function dbToGain(db)
+function H.dbToGain(db)
 	db = tonumber(db)
 	if db == nil or db <= -60 then
 		return 0
@@ -319,7 +346,7 @@ local function dbToGain(db)
 	return 10 ^ ((db - 6) / 40)
 end
 
-local function gainToDb(gain)
+function H.gainToDb(gain)
 	gain = tonumber(gain)
 	if gain == nil or gain <= 0 then
 		return -100
@@ -327,11 +354,11 @@ local function gainToDb(gain)
 	return 40 * math.log(gain, 10) + 6
 end
 
-local function trackAt(idx)
+function H.trackAt(idx)
 	return mpc.tracks and mpc.tracks.normalTracks and mpc.tracks.normalTracks[idx]
 end
 
-local function adjustPropName()
+function H.adjustPropName()
 	if adjustMode == "volume" then
 		return "Volume"
 	elseif adjustMode == "pan" then
@@ -343,7 +370,7 @@ local function adjustPropName()
 end
 
 -- Page colour for the active fader menu (also used by the up/down arrows).
-local function adjustColour()
+function H.adjustColour()
 	if adjustMode == "pan" then
 		return C.magenta
 	elseif adjustMode == "sends" then
@@ -355,12 +382,12 @@ end
 -- Pad mode availability: the mode button lights only when its mappings exist;
 -- otherwise it stays off and the surface keeps today's behaviour.
 
-local function argb(c)
+function H.argb(c)
 	c = tonumber(c) or 0
 	return math.floor(c / 65536) % 256, math.floor(c / 256) % 256, c % 256
 end
 
-local function scale7(v)
+function H.scale7(v)
 	v = tonumber(v) or 0
 	if v < 0 then
 		v = 0
@@ -370,15 +397,15 @@ local function scale7(v)
 	return math.floor(v * 127 / 255)
 end
 
-local function rgbKey(r, g, b)
+function H.rgbKey(r, g, b)
 	return r .. "," .. g .. "," .. b
 end
 
 -- Global matrix position of a window cell
-local function globalPos(col, row)
+function H.globalPos(col, row)
 	if aperture then
-		local gc = call(aperture.ToGlobalColumn, col)
-		local gr = call(aperture.ToGlobalRow, row)
+		local gc = H.call(aperture.ToGlobalColumn, col)
+		local gr = H.call(aperture.ToGlobalRow, row)
 		if type(gc) == "number" and type(gr) == "number" then
 			return gc, gr
 		end
@@ -392,15 +419,15 @@ local function clipStatus(col, row)
 	if not (m and m.HasClip) then
 		return 0
 	end
-	local gc, gr = globalPos(col, row)
-	local has = call(m.HasClip, gc, gr)
+	local gc, gr = H.globalPos(col, row)
+	local has = H.call(m.HasClip, gc, gr)
 	if not has then
 		return 0, gc, gr
 	end
-	if call(m.ClipIsPlaying, gc, gr) or call(m.ClipIsRecording, gc, gr) then
+	if H.call(m.ClipIsPlaying, gc, gr) or H.call(m.ClipIsRecording, gc, gr) then
 		return 2, gc, gr
 	end
-	if call(m.ClipIsStopped, gc, gr) then
+	if H.call(m.ClipIsStopped, gc, gr) then
 		return 1, gc, gr
 	end
 	return 3, gc, gr
@@ -408,14 +435,14 @@ end
 
 local function clipColour(col, row)
 	local p = clipProps and clipProps[col] and clipProps[col][row]
-	local c = propValue(p, "Colour")
+	local c = H.propValue(p, "Colour")
 	if type(c) == "number" and c ~= 0 then
 		return c
 	end
 	local m = mpc.clipMatrix
 	if m and m.GetClipColour then
-		local gc, gr = globalPos(col, row)
-		local v = call(m.GetClipColour, gc, gr)
+		local gc, gr = H.globalPos(col, row)
+		local v = H.call(m.GetClipColour, gc, gr)
 		if type(v) == "number" then
 			return v
 		end
@@ -452,7 +479,7 @@ local function ledRGB(index, r, g, b)
 	elseif b > 127 then
 		b = 127
 	end
-	local key = rgbKey(r, g, b)
+	local key = H.rgbKey(r, g, b)
 	if padCache[index] == key then
 		return
 	end
@@ -479,7 +506,7 @@ local function flushLEDs()
 		dev.midiOut.SendMIDISysex(header .. table.concat(ledSpecs), port)
 	end)
 	if not ok then
-		logOnce("sysex", "SendMIDISysex failed")
+		H.logOnce("sysex", "SendMIDISysex failed")
 	end
 	ledSpecs = {}
 end
@@ -490,7 +517,7 @@ local function sendLayout(layout, page)
 		dev.midiOut.SendMIDISysex(string.char(0x00, 0x20, 0x29, 0x02, 0x0E, 0x00, layout, page, 0x00), port)
 	end)
 	if not ok then
-		logOnce("layout", "layout sysex failed")
+		H.logOnce("layout", "layout sysex failed")
 	end
 end
 
@@ -499,7 +526,7 @@ local function queryLayout()
 		dev.midiOut.SendMIDISysex(string.char(0x00, 0x20, 0x29, 0x02, 0x0E, 0x00), port)
 	end)
 	if not ok then
-		logOnce("layoutq", "layout query failed")
+		H.logOnce("layoutq", "layout query failed")
 	end
 end
 
@@ -608,14 +635,14 @@ local function paintNumberGrid(value)
 end
 
 local function paintTempoGrid()
-	local bpm = math.floor(call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
+	local bpm = math.floor(H.call(mpc.sequencer and mpc.sequencer.GetBPM) or 120)
 	paintNumberGrid(bpm)
 end
 
 local function paintSwingGrid()
 	local q = mpc.sequencer and mpc.sequencer.quantiser
 	-- MPC swing: 50% = straight, 75% = max; clamp the display into the range
-	local swing = math.floor(call(q and q.GetSwing) or 50)
+	local swing = math.floor(H.call(q and q.GetSwing) or 50)
 	paintNumberGrid(math.max(50, math.min(75, swing)))
 end
 
@@ -626,21 +653,21 @@ local function paintAdjustGrid()
 	elseif adjustMode == "sends" then
 		colour = SEND_COLOURS[adjustSend] or C.yellow
 	end
-	local name = adjustPropName()
-	local trackCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or GRID_COLS
+	local name = H.adjustPropName()
+	local trackCount = H.call(mpc.tracks and mpc.tracks.SizeNormalTracks) or GRID_COLS
 	for col = 0, GRID_COLS - 1 do
-		local gc = globalPos(col, 0)
-		local t = trackAt(gc)
+		local gc = H.globalPos(col, 0)
+		local t = H.trackAt(gc)
 		if t and gc < trackCount then
 			local litCount
 			if adjustMode == "volume" then
 				-- dB fader: -inf = no pads, +6 dB = all 8 pads
-				local gain = propValue(t, "Volume")
-				local db = gainToDb(gain)
-				local row = dbToRow(db)
+				local gain = H.propValue(t, "Volume")
+				local db = H.gainToDb(gain)
+				local row = H.dbToRow(db)
 				litCount = (db <= -60) and 0 or (GRID_ROWS - row)
 			else
-				local value = propValue(t, name) or 0
+				local value = H.propValue(t, name) or 0
 				if type(value) ~= "number" then
 					value = 0
 				end
@@ -685,7 +712,7 @@ local function qlinkCount()
 	if not ql then
 		return 0
 	end
-	return call(ql.GetNumQLinks) or 0
+	return H.call(ql.GetNumQLinks) or 0
 end
 
 local function qlinkPosition(i)
@@ -693,7 +720,7 @@ local function qlinkPosition(i)
 	if not q then
 		return 0
 	end
-	return call(q.GetPosition) or 0
+	return H.call(q.GetPosition) or 0
 end
 
 -- Touch() signature is unknown on 3.10.1: try it with no args, ignore any error.
@@ -718,9 +745,9 @@ local qlinkSeenPos = {} -- i -> { min = , max = }
 
 local function qlinkTargetName(i)
 	local q = qlinkAt(i)
-	local name = call(q and q.GetTargetName)
+	local name = H.call(q and q.GetTargetName)
 	if type(name) ~= "string" then
-		name = propValue(q, "TargetName")
+		name = H.propValue(q, "TargetName")
 	end
 	return type(name) == "string" and name or ""
 end
@@ -735,14 +762,14 @@ local function setQlinkPosition(i, pos)
 	end
 	if not qlinkTargetLogged[i] then
 		qlinkTargetLogged[i] = true
-		log(string.format("qlink %d target '%s'", i, qlinkTargetName(i)))
+		H.log(string.format("qlink %d target '%s'", i, qlinkTargetName(i)))
 	end
-	local before = call(q.GetValueString)
-	local posBefore = call(q.GetPosition) or 0
+	local before = H.call(q.GetValueString)
+	local posBefore = H.call(q.GetPosition) or 0
 	touchQlink(q)
 	if type(q.Twist) == "function" then
 		for _ = 1, 2 do
-			local delta = pos - (call(q.GetPosition) or 0)
+			local delta = pos - (H.call(q.GetPosition) or 0)
 			if delta == 0 then
 				break
 			end
@@ -751,24 +778,24 @@ local function setQlinkPosition(i, pos)
 			elseif delta < -127 then
 				delta = -127
 			end
-			call(q.Twist, delta)
+			H.call(q.Twist, delta)
 		end
 	end
-	local afterTwist = call(q.GetValueString)
+	local afterTwist = H.call(q.GetValueString)
 	if afterTwist == before and type(q.SetValue) == "function" then
 		-- Twist did not change the target value: try the target value directly.
 		-- GetValue() is the current un-normalised value; scale by the position change.
-		local v = call(q.GetValue)
+		local v = H.call(q.GetValue)
 		if type(v) == "number" and posBefore ~= 0 then
-			call(q.SetValue, v * pos / posBefore)
+			H.call(q.SetValue, v * pos / posBefore)
 		end
-		call(q.SetPosition, pos)
+		H.call(q.SetPosition, pos)
 	elseif type(q.SetPosition) == "function" then
-		call(q.SetPosition, pos) -- keep the knob position in sync with the target
+		H.call(q.SetPosition, pos) -- keep the knob position in sync with the target
 	end
 	touchQlink(q)
-	local str = tostring(call(q.GetValueString) or "")
-	log(string.format("qlink %d = %d (%s)", i, pos, str))
+	local str = tostring(H.call(q.GetValueString) or "")
+	H.log(string.format("qlink %d = %d (%s)", i, pos, str))
 	-- flip learning: remember distinct value strings and the position span; two distinct
 	-- strings across a wide span means the parameter is binary (round to extremes)
 	if str ~= "" then
@@ -796,7 +823,7 @@ local function setQlinkPosition(i, pos)
 		end
 		if n == 2 and span.max - span.min >= 48 and not qlinkFlip[i] then
 			qlinkFlip[i] = true
-			log(string.format("qlink %d flip parameter", i))
+			H.log(string.format("qlink %d flip parameter", i))
 		end
 	end
 end
@@ -916,15 +943,15 @@ local function nudgeQlink(delta)
 	if pos + delta < 0 or pos + delta > 127 then
 		return
 	end
-	call(q.Twist, delta)
-	log(string.format("qlink %d = %d (%s)", i, pos + delta, tostring(call(q.GetValueString) or "")))
+	H.call(q.Twist, delta)
+	H.log(string.format("qlink %d = %d (%s)", i, pos + delta, tostring(H.call(q.GetValueString) or "")))
 	paintAll()
 end
 
 local function enterQlink()
 	local cs = mpc.controlSurface
 	if not (cs and cs.qlinks) then
-		logOnce("noqlinks", "qlink page unavailable: controlSurface.qlinks missing")
+		H.logOnce("noqlinks", "qlink page unavailable: controlSurface.qlinks missing")
 		return
 	end
 	adjustMode = nil
@@ -949,12 +976,12 @@ local function enterQlink()
 			map[#map + 1] = (c + 1) .. "=-"
 		end
 	end
-	log("qlink page (" .. assignedCount .. " assigned): " .. table.concat(map, ", "))
+	H.log("qlink page (" .. assignedCount .. " assigned): " .. table.concat(map, ", "))
 	paintAll()
 end
 local function exitQlink()
 	qlinkMode = false
-	log("qlink page off")
+	H.log("qlink page off")
 	paintAll()
 end
 
@@ -978,13 +1005,13 @@ end
 -- caller falls back to polling clipMatrix for that pad.
 local function paintClipSlot(col, row)
 	local p = clipProps and clipProps[col] and clipProps[col][row]
-	local state = tonumber(propValue(p, "State"))
+	local state = tonumber(H.propValue(p, "State"))
 	if state == nil then
 		return false
 	end
 	local idx = 10 * (8 - row) + col + 1
 	if state < 2 then
-		if propValue(p, "Selected") == true then
+		if H.propValue(p, "Selected") == true then
 			ledCol(idx, C.available)
 		else
 			ledOff(idx)
@@ -997,10 +1024,10 @@ local function paintClipSlot(col, row)
 	elseif state >= 3 then
 		r, g, b = C.green[1], C.green[2], C.green[3]
 	else
-		r, g, b = argb(clipColour(col, row))
+		r, g, b = H.argb(clipColour(col, row))
 	end
 	if state >= 3 and not blinkPhase(CLIP_BLINK_FAST[state]) then
-		r, g, b = scale7(r * 0.18), scale7(g * 0.18), scale7(b * 0.18)
+		r, g, b = H.scale7(r * 0.18), H.scale7(g * 0.18), H.scale7(b * 0.18)
 	end
 	ledRGB(idx, r, g, b)
 	return true
@@ -1021,13 +1048,13 @@ local function paintChromaticGrid()
 			local idx = 10 * (padRow + 1) + col + 1
 			local i = padRow * 8 + col
 			local p = (virt and virt[i]) or (pads and pads[i])
-			local v = call(p and p.GetColour)
+			local v = H.call(p and p.GetColour)
 			if type(v) ~= "number" then
-				v = propValue(p, "Colour")
+				v = H.propValue(p, "Colour")
 			end
 			if type(v) == "number" and v ~= 0 and v ~= -16777216 then
-				local r, g, b = argb(v)
-				ledRGB(idx, scale7(r), scale7(g), scale7(b))
+				local r, g, b = H.argb(v)
+				ledRGB(idx, H.scale7(r), H.scale7(g), H.scale7(b))
 			else
 				ledRGB(idx, 0, 15, 30)
 			end
@@ -1058,18 +1085,18 @@ local function paintPadsGrid(poll)
 		local idx = 10 * (math.floor(i / 4) + 1) + (i % 4) + 1
 		if poll then
 			local p = pads and pads[i]
-			local v = call(p and p.GetColour)
+			local v = H.call(p and p.GetColour)
 			if type(v) ~= "number" then
-				v = propValue(p, "Colour")
+				v = H.propValue(p, "Colour")
 			end
 			if v ~= padsColourCache[i] then
 				padsColourCache[i] = v
-				local r, g, b = argb(v)
-				ledRGB(idx, scale7(r), scale7(g), scale7(b))
+				local r, g, b = H.argb(v)
+				ledRGB(idx, H.scale7(r), H.scale7(g), H.scale7(b))
 			end
 		elseif type(padsColourCache[i]) == "number" then
-			local r, g, b = argb(padsColourCache[i])
-			ledRGB(idx, scale7(r), scale7(g), scale7(b))
+			local r, g, b = H.argb(padsColourCache[i])
+			ledRGB(idx, H.scale7(r), H.scale7(g), H.scale7(b))
 		end
 	end
 end
@@ -1106,7 +1133,7 @@ local function paintGrid()
 					ledOff(idx)
 				else
 					local c = clipColour(col, row)
-					local r, g, b = argb(c)
+					local r, g, b = H.argb(c)
 					local k = 1.0
 					if status == 1 then
 						k = 0.18
@@ -1115,7 +1142,7 @@ local function paintGrid()
 					elseif status == 2 then
 						k = 0.95
 					end
-					ledRGB(idx, scale7(r * k), scale7(g * k), scale7(b * k))
+					ledRGB(idx, H.scale7(r * k), H.scale7(g * k), H.scale7(b * k))
 				end
 			end
 		end
@@ -1127,7 +1154,7 @@ local function paintScene()
 		local idx = SCENE[row + 1]
 		local state = nil
 		if aperture and aperture.sceneProperties and aperture.sceneProperties[row] then
-			state = propValue(aperture.sceneProperties[row], "State")
+			state = H.propValue(aperture.sceneProperties[row], "State")
 		end
 		if state == S.Playing or state == S.Recording then
 			ledCol(idx, C.green)
@@ -1187,27 +1214,27 @@ local function paintTrack()
 	ledCol(TRACK.stopClip, stopClip)
 	-- CC 101-108: track buttons. Show the held function's state per track, or the track colour.
 	for col = 0, 7 do
-		local gc = globalPos(col, 0)
+		local gc = H.globalPos(col, 0)
 		local t = mpc.tracks and mpc.tracks.normalTracks and mpc.tracks.normalTracks[gc]
 		local r, g, b = C.dim[1], C.dim[2], C.dim[3]
 		if t then
 			if heldFunction == "mute" then
-				if propValue(t, "Mute") then
+				if H.propValue(t, "Mute") then
 					r, g, b = C.orange[1], C.orange[2], C.orange[3]
 				end
 			elseif heldFunction == "solo" then
-				if propValue(t, "Solo") then
+				if H.propValue(t, "Solo") then
 					r, g, b = C.yellow[1], C.yellow[2], C.yellow[3]
 				end
 			elseif heldFunction == "recArm" then
-				if propValue(t, "RecArm") then
+				if H.propValue(t, "RecArm") then
 					r, g, b = C.red[1], C.red[2], C.red[3]
 				end
 			else
-				local c = propValue(t, "Colour")
+				local c = H.propValue(t, "Colour")
 				if type(c) == "number" then
-					local cr, cg, cb = argb(c)
-					r, g, b = scale7(cr * 0.3), scale7(cg * 0.3), scale7(cb * 0.3)
+					local cr, cg, cb = H.argb(c)
+					r, g, b = H.scale7(cr * 0.3), H.scale7(cg * 0.3), H.scale7(cb * 0.3)
 				end
 			end
 		end
@@ -1264,15 +1291,15 @@ end
 
 -- Quantiser on/off is a project setting (sequencer.quantiser.Enabled).
 local function quantiserEnabled()
-	return truthy(propValue(mpc.sequencer and mpc.sequencer.quantiser, "Enabled"))
+	return H.truthy(H.propValue(mpc.sequencer and mpc.sequencer.quantiser, "Enabled"))
 end
 
 local function paintLeft()
 	local sq = mpc.sequencer
-	local playing = truthy(sq and call(sq.IsPlaying) or propValue(sq, "Playing"))
-	local recording = truthy(propValue(sq, "RecordState"))
-	local overdub = truthy(propValue(sq, "OverdubState"))
-	local loop = truthy(propValue(sq, "Loop"))
+	local playing = H.truthy(sq and H.call(sq.IsPlaying) or H.propValue(sq, "Playing"))
+	local recording = H.truthy(H.propValue(sq, "RecordState"))
+	local overdub = H.truthy(H.propValue(sq, "OverdubState"))
+	local loop = H.truthy(H.propValue(sq, "Loop"))
 	-- play: green while playing, orange while loop is enabled, dim otherwise
 	if playing then
 		ledCol(LEFT.play, C.green)
@@ -1300,7 +1327,7 @@ local function paintLeft()
 	end
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
 	local pageColour = tempoMode and C.white
-		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or adjustColour()))
+		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or H.adjustColour()))
 	ledCol(LEFT.duplicate, C.white)
 	ledCol(LEFT.clear, C.white)
 	ledRGB(
@@ -1362,7 +1389,7 @@ local function repaintFn(fn)
 	return function(...)
 		local ok, err = pcall(fn, ...)
 		if not ok then
-			logOnce("listenererror", "listener error: " .. tostring(err))
+			H.logOnce("listenererror", "listener error: " .. tostring(err))
 		end
 	end
 end
@@ -1408,15 +1435,15 @@ end
 -- track, so the grid follows track selection too.
 local function followCurrentTrack(index)
 	if followMode and aperture and type(index) == "number" then
-		local normalCount = call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
+		local normalCount = H.call(mpc.tracks and mpc.tracks.SizeNormalTracks) or 0
 		if index >= normalCount then
-			call(aperture.SetActiveMatrix, "Master")
-			call(aperture.MoveToColumn, index - normalCount)
+			H.call(aperture.SetActiveMatrix, "Master")
+			H.call(aperture.MoveToColumn, index - normalCount)
 		else
-			call(aperture.SetActiveMatrix, "Normal")
-			call(aperture.MoveToColumn, index)
+			H.call(aperture.SetActiveMatrix, "Normal")
+			H.call(aperture.MoveToColumn, index)
 		end
-		log("follow current track " .. tostring(index))
+		H.log("follow current track " .. tostring(index))
 	end
 	listenGrid()
 	padCache = {}
@@ -1475,7 +1502,7 @@ local function listenAll()
 		)
 	end
 	-- align the window with the current track (also registers the slot listeners)
-	followCurrentTrack(propValue(ct, "Index"))
+	followCurrentTrack(H.propValue(ct, "Index"))
 end
 
 local function removeListeners()
@@ -1517,10 +1544,10 @@ end
 -- performance modes and their key/scale settings — via controlSurface.padPerform.
 
 local function pressSurfaceButton(name)
-	local press = callable(mpc.controlSurface and mpc.controlSurface[name], "Press")
+	local press = H.callable(mpc.controlSurface and mpc.controlSurface[name], "Press")
 	if press then
-		call(press)
-		call(callable(mpc.controlSurface[name], "Release"))
+		H.call(press)
+		H.call(H.callable(mpc.controlSurface[name], "Release"))
 		return true
 	end
 	return false
@@ -1532,16 +1559,16 @@ padsLayoutAvailable = function()
 		return false
 	end
 	local field = (padsLayout == "pads64") and "AddNoteToVirtualPad" or "AddNoteToMpcPad"
-	return callable(pads, field) ~= nil
+	return H.callable(pads, field) ~= nil
 end
 
 local function openPadPerformPage()
 	-- Opens the MPC's Pad Perform page: pad chord modes with their key/scale
 	-- selection on the MPC screen.
 	if pressSurfaceButton("padPerform") then
-		log("pad perform page open on MPC")
+		H.log("pad perform page open on MPC")
 	else
-		logOnce("padperform", "padPerform unavailable on this MPC")
+		H.logOnce("padperform", "padPerform unavailable on this MPC")
 	end
 end
 
@@ -1554,11 +1581,11 @@ local function exitPadsMode()
 	local pads = dev.mappings and dev.mappings.pads
 	for _, b in ipairs(boundPadNotes) do
 		if b.pad then
-			call(pads and pads.RemoveNoteToMpcPad, 0, b.note, b.pad)
+			H.call(pads and pads.RemoveNoteToMpcPad, 0, b.note, b.pad)
 		else
-			call(pads and pads.RemoveNoteToVirtualPad, 0, b.note)
+			H.call(pads and pads.RemoveNoteToVirtualPad, 0, b.note)
 		end
-		call(m and m.AddNoteToScript, 0, b.note)
+		H.call(m and m.AddNoteToScript, 0, b.note)
 	end
 	boundPadNotes = {}
 	padsColourCache = {}
@@ -1567,12 +1594,12 @@ local function exitPadsMode()
 		-- engine on an out-of-range bank where every track's pads are dark and silent
 		-- (they still show MIDI activity). Return the pad bank to A on the way out.
 		if pressSurfaceButton("bank1") then
-			log("pad bank reset (bank 1)")
+			H.log("pad bank reset (bank 1)")
 		else
-			logOnce("bankreset", "pad bank reset unavailable: controlSurface.bank1 missing")
+			H.logOnce("bankreset", "pad bank reset unavailable: controlSurface.bank1 missing")
 		end
 	end
-	log("pads mode off")
+	H.log("pads mode off")
 end
 
 -- Enter pads mode: route the 16 quadrant notes to the MPC pads (hardware-routed; they no
@@ -1593,15 +1620,15 @@ local function enterPadsMode()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
 	if not (m and pads and m.RemoveNoteToScript) then
-		logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
+		H.logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
 		return
 	end
 	if padsLayout == "pads64" and type(pads.AddNoteToVirtualPad) ~= "function" then
-		logOnce("padschromatic", "chromatic layout unavailable: AddNoteToVirtualPad missing")
+		H.logOnce("padschromatic", "chromatic layout unavailable: AddNoteToVirtualPad missing")
 		return
 	end
 	if padsLayout == "drum" and type(pads.AddNoteToMpcPad) ~= "function" then
-		logOnce("padsmode", "pads mode unavailable: AddNoteToMpcPad missing")
+		H.logOnce("padsmode", "pads mode unavailable: AddNoteToMpcPad missing")
 		return
 	end
 	padsMode = true
@@ -1613,34 +1640,34 @@ local function enterPadsMode()
 		-- pads report black and the mirror would go dark. Return the MPC to its Main
 		-- screen so the grid lights up (guarded; logged once if unavailable).
 		if pressSurfaceButton("main") then
-			log("pad view: main screen")
+			H.log("pad view: main screen")
 		else
-			logOnce("padview", "pad view reset unavailable: controlSurface.main missing")
+			H.logOnce("padview", "pad view reset unavailable: controlSurface.main missing")
 		end
 	end
 	if padsLayout == "pads64" then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
 				local note = 10 * (padRow + 1) + col + 1
-				call(m.RemoveNoteToScript, 0, note)
-				call(pads.AddNoteToVirtualPad, 0, note, chromaticVirtualPad(padRow, col))
+				H.call(m.RemoveNoteToScript, 0, note)
+				H.call(pads.AddNoteToVirtualPad, 0, note, chromaticVirtualPad(padRow, col))
 				boundPadNotes[#boundPadNotes + 1] = { note = note }
 			end
 		end
 	else
 		for i = 0, 15 do
 			local note = padsModeNote(i)
-			call(m.RemoveNoteToScript, 0, note)
-			call(pads.AddNoteToMpcPad, 0, note, i)
+			H.call(m.RemoveNoteToScript, 0, note)
+			H.call(pads.AddNoteToMpcPad, 0, note, i)
 			boundPadNotes[#boundPadNotes + 1] = { note = note, pad = i }
 		end
 	end
-	log("pads mode on (" .. padsLayout .. ")")
+	H.log("pads mode on (" .. padsLayout .. ")")
 	if padsLayout == "pads64" then
 		-- the 8x8 view itself is a screen-side setting with no script API; without it
 		-- the MPC stays in the 16-pad view and the upper pad colours/banks do not
 		-- populate (there is no 8x8 mode for drum kits at all)
-		logOnce("tip8x8", "tip: switch the MPC's pad view to 8x8 64 Pads for full colours")
+		H.logOnce("tip8x8", "tip: switch the MPC's pad view to 8x8 64 Pads for full colours")
 	end
 end
 
@@ -1648,7 +1675,7 @@ end
 -- get the drum layout, melodic programs (Plugin/Keygroup/MIDI) get chromatic.
 local function firstLayoutForTrack()
 	local t = mpc.tracks and mpc.tracks.currentTrack
-	local trackType = propValue(t, "Type")
+	local trackType = H.propValue(t, "Type")
 	if type(trackType) == "string" and trackType ~= "" and trackType ~= "Drum" then
 		return "pads64", trackType
 	end
@@ -1663,7 +1690,7 @@ local function togglePadsMode()
 	if not padsMode then
 		local layout, trackType = firstLayoutForTrack()
 		padsLayout = layout
-		log("track type " .. tostring(trackType or "?") .. " -> " .. layout)
+		H.log("track type " .. tostring(trackType or "?") .. " -> " .. layout)
 		closeGridStates()
 		enterPadsMode()
 		if padsMode then
@@ -1678,7 +1705,7 @@ end
 local function setMode(m)
 	exitPadsMode() -- another mode (CC 93 session, CC 97, ...) always returns to the clip grid
 	mode = m
-	log("mode -> " .. m)
+	H.log("mode -> " .. m)
 	paintAll()
 end
 
@@ -1687,12 +1714,12 @@ local function doClip(col, row)
 		return
 	end
 	if shift then
-		call(aperture.SelectClip, col, row)
-		log(string.format("SelectClip(%d,%d)", col, row))
+		H.call(aperture.SelectClip, col, row)
+		H.log(string.format("SelectClip(%d,%d)", col, row))
 	else
-		call(aperture.SelectClip, col, row)
-		call(aperture.TriggerClip, col, row)
-		log(string.format("TriggerClip(%d,%d)", col, row))
+		H.call(aperture.SelectClip, col, row)
+		H.call(aperture.TriggerClip, col, row)
+		H.log(string.format("TriggerClip(%d,%d)", col, row))
 	end
 end
 
@@ -1700,8 +1727,8 @@ local function doScene(row)
 	if not aperture then
 		return
 	end
-	call(aperture.TriggerRow, row)
-	log("TriggerRow(" .. row .. ")")
+	H.call(aperture.TriggerRow, row)
+	H.log("TriggerRow(" .. row .. ")")
 end
 
 -- Shift + right-column button: the label functions (patterns/steps/...).
@@ -1713,7 +1740,7 @@ local function handleRightLabel(row)
 	elseif row == 2 then
 		setMode("track")
 	else
-		log("page " .. row .. ": TODO")
+		H.log("page " .. row .. ": TODO")
 	end
 end
 
@@ -1721,26 +1748,26 @@ end
 local function applyFunction(fn, idx)
 	local t = mpc.tracks and mpc.tracks.normalTracks and mpc.tracks.normalTracks[idx]
 	if not t then
-		logOnce("track", "no track " .. tostring(idx))
+		H.logOnce("track", "no track " .. tostring(idx))
 		return
 	end
 	if fn == "recArm" then
-		local v = propValue(t, "RecArm")
-		call(t.SetRecArm, not v)
-		log("SetRecArm(" .. tostring(not v) .. ") track " .. idx)
+		local v = H.propValue(t, "RecArm")
+		H.call(t.SetRecArm, not v)
+		H.log("SetRecArm(" .. tostring(not v) .. ") track " .. idx)
 	elseif fn == "mute" then
-		local v = propValue(t, "Mute")
-		call(t.SetMute, not v)
-		log("SetMute(" .. tostring(not v) .. ") track " .. idx)
+		local v = H.propValue(t, "Mute")
+		H.call(t.SetMute, not v)
+		H.log("SetMute(" .. tostring(not v) .. ") track " .. idx)
 	elseif fn == "solo" then
-		local v = propValue(t, "Solo")
-		call(t.SetSolo, not v)
-		log("SetSolo(" .. tostring(not v) .. ") track " .. idx)
+		local v = H.propValue(t, "Solo")
+		H.call(t.SetSolo, not v)
+		H.log("SetSolo(" .. tostring(not v) .. ") track " .. idx)
 	elseif fn == "stopClip" then
-		call(aperture and aperture.StopClipsOnTrack, idx)
-		log("StopClipsOnTrack(" .. idx .. ")")
+		H.call(aperture and aperture.StopClipsOnTrack, idx)
+		H.log("StopClipsOnTrack(" .. idx .. ")")
 	else
-		log(fn .. ": unsupported track function " .. idx)
+		H.log(fn .. ": unsupported track function " .. idx)
 	end
 end
 
@@ -1750,45 +1777,45 @@ end
 -- everything reading it (note mode's track type, track nav, plugin presets) —
 -- follows. Call both so the column highlight and the real selection agree.
 local function selectTrack(col, gc)
-	local setCurrent = callable(mpc.tracks, "SetCurrentTrack")
+	local setCurrent = H.callable(mpc.tracks, "SetCurrentTrack")
 	if setCurrent then
-		call(setCurrent, gc)
-		log("SetCurrentTrack(" .. gc .. ")")
+		H.call(setCurrent, gc)
+		H.log("SetCurrentTrack(" .. gc .. ")")
 	end
 	if aperture then
-		call(aperture.SelectTrack, col)
+		H.call(aperture.SelectTrack, col)
 	end
 end
 
 -- Write a track property (Volume/Pan/Send1-4) through its .value, guarded.
 local function setTrackValue(idx, name, v)
-	local t = trackAt(idx)
+	local t = H.trackAt(idx)
 	if not t then
-		logOnce("track", "no track " .. tostring(idx))
+		H.logOnce("track", "no track " .. tostring(idx))
 		return
 	end
 	local p = t[name]
 	if p == nil then
-		logOnce("prop" .. name, name .. " MISSING on track " .. tostring(idx))
+		H.logOnce("prop" .. name, name .. " MISSING on track " .. tostring(idx))
 		return
 	end
-	local value = clamp01(v)
+	local value = H.clamp01(v)
 	local ok = pcall(function()
 		p.value = value
 	end)
 	if not ok then
-		logOnce("set" .. name, "set " .. name .. " failed on track " .. tostring(idx))
+		H.logOnce("set" .. name, "set " .. name .. " failed on track " .. tostring(idx))
 		return
 	end
-	log(string.format("%s track %d = %.3f", name, idx, value))
+	H.log(string.format("%s track %d = %.3f", name, idx, value))
 end
 
 -- Write a track's VolumeDB directly (dB), falling back to the linear Volume
 -- property if VolumeDB is read-only on this firmware.
 local function setTrackVolumeDB(idx, db)
-	local t = trackAt(idx)
+	local t = H.trackAt(idx)
 	if not t then
-		logOnce("track", "no track " .. tostring(idx))
+		H.logOnce("track", "no track " .. tostring(idx))
 		return
 	end
 	local p = t.VolumeDB
@@ -1797,54 +1824,54 @@ local function setTrackVolumeDB(idx, db)
 			p.value = db
 		end)
 		if ok then
-			log(string.format("VolumeDB track %d = %s", idx, tostring(db)))
+			H.log(string.format("VolumeDB track %d = %s", idx, tostring(db)))
 			return
 		end
 	end
 	-- fallback: invert the MPC fader curve (dB = 40*log10(gain) + 6)
-	setTrackValue(idx, "Volume", dbToGain(db))
+	setTrackValue(idx, "Volume", H.dbToGain(db))
 end
 
 local function changeTempo(delta)
-	if not requireProject("tempo") then
+	if not H.requireProject("tempo") then
 		return
 	end
 	local sq = mpc.sequencer
-	local bpm = call(sq and sq.GetBPM) or 120
+	local bpm = H.call(sq and sq.GetBPM) or 120
 	bpm = math.max(20, math.min(300, math.floor(bpm + delta + 0.5)))
-	call(sq and sq.SetBPM, bpm)
-	log("tempo: " .. bpm .. " BPM")
+	H.call(sq and sq.SetBPM, bpm)
+	H.log("tempo: " .. bpm .. " BPM")
 	paintGrid()
 	paintLeft()
 	flushLEDs()
 end
 
 local function changeSwing(delta)
-	if not requireProject("swing") then
+	if not H.requireProject("swing") then
 		return
 	end
 	local q = mpc.sequencer and mpc.sequencer.quantiser
 	-- MPC swing: 50% = straight, > 50 delays every other step; 75% is the max
-	local swing = call(q and q.GetSwing) or 50
+	local swing = H.call(q and q.GetSwing) or 50
 	swing = math.max(50, math.min(75, math.floor(swing + delta + 0.5)))
-	call(q and q.SetSwing, swing)
-	log("swing: " .. swing .. "%")
+	H.call(q and q.SetSwing, swing)
+	H.log("swing: " .. swing .. "%")
 	paintGrid()
 	paintLeft()
 	flushLEDs()
 end
 
 local function doQuantize()
-	if not requireProject("quantize") then
+	if not H.requireProject("quantize") then
 		return
 	end
-	local press = callable(mpc.controlSurface and mpc.controlSurface.quantizeApply, "Press")
+	local press = H.callable(mpc.controlSurface and mpc.controlSurface.quantizeApply, "Press")
 	if press then
-		call(press)
-		call(callable(mpc.controlSurface.quantizeApply, "Release"))
-		log("quantize applied")
+		H.call(press)
+		H.call(H.callable(mpc.controlSurface.quantizeApply, "Release"))
+		H.log("quantize applied")
 	else
-		logOnce("quantize", "quantize unavailable: controlSurface.quantizeApply missing")
+		H.logOnce("quantize", "quantize unavailable: controlSurface.quantizeApply missing")
 	end
 end
 
@@ -1852,14 +1879,14 @@ local function nudgeAdjust(delta)
 	if not adjustMode then
 		return
 	end
-	local gc = globalPos(adjustCol, 0)
-	local name = adjustPropName()
+	local gc = H.globalPos(adjustCol, 0)
+	local name = H.adjustPropName()
 	if not name then
 		return
 	end
 	if adjustMode == "volume" then
-		local db = gainToDb(propValue(trackAt(gc), "Volume"))
-		local row = dbToRow(db)
+		local db = H.gainToDb(H.propValue(H.trackAt(gc), "Volume"))
+		local row = H.dbToRow(db)
 		if delta > 0 then
 			row = math.max(0, row - 1)
 		else
@@ -1869,7 +1896,7 @@ local function nudgeAdjust(delta)
 		paintAll()
 		return
 	end
-	local cur = propValue(trackAt(gc), name)
+	local cur = H.propValue(H.trackAt(gc), name)
 	if type(cur) ~= "number" then
 		cur = 0
 	end
@@ -1888,7 +1915,7 @@ local function enterAdjust(newMode)
 	if newMode == "sends" then
 		adjustSend = 1
 	end
-	log("menu " .. newMode)
+	H.log("menu " .. newMode)
 	paintAll()
 end
 
@@ -1896,7 +1923,7 @@ local function exitAdjust()
 	if adjustMode then
 		adjustMode = nil
 		lastPadCol, lastPadRow, lastPadTick = nil, nil, -100
-		log("menu off")
+		H.log("menu off")
 		paintAll()
 	end
 end
@@ -1905,7 +1932,7 @@ local function handleAdjustPad(col, row)
 	if not adjustMode then
 		return
 	end
-	local gc = globalPos(col, 0)
+	local gc = H.globalPos(col, 0)
 	if adjustMode == "volume" then
 		setTrackVolumeDB(gc, VOLUME_DB[row])
 		lastPadCol, lastPadRow, lastPadTick = col, row, ticks
@@ -1922,7 +1949,7 @@ local function handleAdjustPad(col, row)
 	end
 	lastPadCol, lastPadRow, lastPadTick = col, row, ticks
 	adjustCol = col
-	local name = adjustPropName()
+	local name = H.adjustPropName()
 	if name then
 		setTrackValue(gc, name, value)
 		paintAll()
@@ -1935,7 +1962,7 @@ end
 -- Tap tempo: use dev.timer.Now() (ms, high resolution) and average the last
 -- few tap intervals. Falls back to the 50 ms timer tick if Now() is missing.
 local function doTapTempo()
-	local now = call(dev.timer and dev.timer.Now)
+	local now = H.call(dev.timer and dev.timer.Now)
 	local useMs = type(now) == "number"
 	if not useMs then
 		now = ticks
@@ -1956,7 +1983,7 @@ local function doTapTempo()
 		table.remove(tapTicks, 1)
 	end
 	if #tapTicks < 2 then
-		log("tap tempo: first tap")
+		H.log("tap tempo: first tap")
 		return
 	end
 	local total = 0
@@ -1967,12 +1994,12 @@ local function doTapTempo()
 	local bpm = (useMs and 60000 or 1200) / avg
 	bpm = math.max(20, math.min(300, bpm))
 	bpm = math.floor(bpm + 0.5) -- MPC BPM is an integer
-	local setBPM = callable(mpc.sequencer, "SetBPM")
+	local setBPM = H.callable(mpc.sequencer, "SetBPM")
 	if setBPM then
-		call(setBPM, bpm)
-		log(string.format("tap tempo: %d BPM (%.1f ms)", bpm, avg))
+		H.call(setBPM, bpm)
+		H.log(string.format("tap tempo: %d BPM (%.1f ms)", bpm, avg))
 	else
-		logOnce("tapbpm", "tap tempo unavailable: sequencer.SetBPM missing")
+		H.logOnce("tapbpm", "tap tempo unavailable: sequencer.SetBPM missing")
 	end
 end
 
@@ -1990,20 +2017,20 @@ local function updateTapTempoRouting(held)
 		end)
 		if ok then
 			nativeTap = true
-			logOnce("tapnative", "tap tempo: native")
+			H.logOnce("tapnative", "tap tempo: native")
 			return
 		end
 	end
 	if nativeTap then
-		call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
-		call(m and m.AddCCToScript, 0, TRACK.sends)
+		H.call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
+		H.call(m and m.AddCCToScript, 0, TRACK.sends)
 		nativeTap = false
 	elseif held then
 		-- a failed bind may have left CC 6 unregistered: keep it on the script
-		call(m and m.AddCCToScript, 0, TRACK.sends)
+		H.call(m and m.AddCCToScript, 0, TRACK.sends)
 	end
 	if held then
-		logOnce("tapmanual", "tap tempo: manual fallback")
+		H.logOnce("tapmanual", "tap tempo: manual fallback")
 	end
 end
 
@@ -2011,27 +2038,27 @@ local function doShiftFunction(fn)
 	if fn == "recArm" then
 		local cm = mpc.commandManager
 		if cm and type(cm.Undo) == "function" then
-			call(cm.Undo)
-			log("Undo")
+			H.call(cm.Undo)
+			H.log("Undo")
 		else
-			logOnce("undo", "Undo unavailable: commandManager.Undo missing")
+			H.logOnce("undo", "Undo unavailable: commandManager.Undo missing")
 		end
 	elseif fn == "mute" then
 		local cm = mpc.commandManager
 		if cm and type(cm.Redo) == "function" then
-			call(cm.Redo)
-			log("Redo")
+			H.call(cm.Redo)
+			H.log("Redo")
 		else
-			logOnce("redo", "Redo unavailable: commandManager.Redo missing")
+			H.logOnce("redo", "Redo unavailable: commandManager.Redo missing")
 		end
 	elseif fn == "solo" then
 		local sq = mpc.sequencer
-		local me = propValue(sq, "MetronomeEnabled")
+		local me = H.propValue(sq, "MetronomeEnabled")
 		if sq and type(sq.SetMetronomeEnabled) == "function" then
-			call(sq.SetMetronomeEnabled, not me)
-			log("Metronome " .. tostring(not me))
+			H.call(sq.SetMetronomeEnabled, not me)
+			H.log("Metronome " .. tostring(not me))
 		else
-			logOnce("metronome", "metronome unavailable: sequencer.SetMetronomeEnabled missing")
+			H.logOnce("metronome", "metronome unavailable: sequencer.SetMetronomeEnabled missing")
 		end
 	elseif fn == "sends" then
 		-- CC 6 is routed to the MPC's native Tap Tempo while Shift is held;
@@ -2047,9 +2074,9 @@ local function doShiftFunction(fn)
 		tempoMode = not tempoMode
 		tempoHold = nil
 		if tempoMode then
-			log("tempo page: " .. tostring(call(mpc.sequencer and mpc.sequencer.GetBPM)) .. " BPM")
+			H.log("tempo page: " .. tostring(H.call(mpc.sequencer and mpc.sequencer.GetBPM)) .. " BPM")
 		else
-			log("tempo page off")
+			H.log("tempo page off")
 		end
 		paintAll()
 		flushLEDs()
@@ -2062,38 +2089,38 @@ local function doShiftFunction(fn)
 		swingMode = not swingMode
 		swingHold = nil
 		if swingMode then
-			log(
+			H.log(
 				"swing page: "
-					.. tostring(call(mpc.sequencer and mpc.sequencer.quantiser and mpc.sequencer.quantiser.GetSwing))
+					.. tostring(H.call(mpc.sequencer and mpc.sequencer.quantiser and mpc.sequencer.quantiser.GetSwing))
 					.. "%"
 			)
 		else
-			log("swing page off")
+			H.log("swing page off")
 		end
 		paintAll()
 		flushLEDs()
 	else
-		log(fn .. " shift: TODO")
+		H.log(fn .. " shift: TODO")
 	end
 end
 
 local function doTransport(fn)
-	if not requireProject("transport") then
+	if not H.requireProject("transport") then
 		return
 	end
 	local sq = mpc.sequencer
 	if fn == "play" then
-		local playing = sq and call(sq.IsPlaying) or propValue(sq, "Playing")
+		local playing = sq and H.call(sq.IsPlaying) or H.propValue(sq, "Playing")
 		if playing then
-			call(sq and sq.Stop)
-			log("Stop")
+			H.call(sq and sq.Stop)
+			H.log("Stop")
 		else
-			call(sq and sq.Play)
-			log("Play")
+			H.call(sq and sq.Play)
+			H.log("Play")
 		end
 	elseif fn == "record" then
-		call(sq and sq.Record)
-		log("Record")
+		H.call(sq and sq.Record)
+		H.log("Record")
 	end
 end
 
@@ -2102,80 +2129,80 @@ end
 -- triggered), the next press disarms. Delegates to controlSurface.record so the
 -- MPC's record state machine does the work; falls back to Record/RecordOff.
 local function recordArmed()
-	return truthy(propValue(mpc.sequencer, "RecordState"))
+	return H.truthy(H.propValue(mpc.sequencer, "RecordState"))
 end
 
 local function doRecordToggle()
-	if not requireProject("record") then
+	if not H.requireProject("record") then
 		return
 	end
 	local armed = recordArmed()
 	if pressSurfaceButton("record") then
-		log("record: " .. (armed and "disarmed" or "armed"))
+		H.log("record: " .. (armed and "disarmed" or "armed"))
 		return
 	end
 	local name = armed and "RecordOff" or "Record"
-	local f = callable(mpc.sequencer, name)
+	local f = H.callable(mpc.sequencer, name)
 	if not f then
-		logOnce("record", "record unavailable: sequencer." .. name .. " missing")
+		H.logOnce("record", "record unavailable: sequencer." .. name .. " missing")
 		return
 	end
-	call(f)
-	log("record: " .. (armed and "disarmed" or "armed"))
+	H.call(f)
+	H.log("record: " .. (armed and "disarmed" or "armed"))
 end
 
 -- Shift + play (CC 20): loop on/off (Loop is a userdata property with .value).
 local function doLoopToggle()
-	if not requireProject("loop") then
+	if not H.requireProject("loop") then
 		return
 	end
 	local sq = mpc.sequencer
-	local loop = propValue(sq, "Loop")
+	local loop = H.propValue(sq, "Loop")
 	if not sq or sq.Loop == nil then
-		logOnce("loop", "loop unavailable: sequencer.Loop missing")
+		H.logOnce("loop", "loop unavailable: sequencer.Loop missing")
 		return
 	end
 	local ok = pcall(function()
 		sq.Loop.value = not loop
 	end)
 	if not ok then
-		logOnce("loopwrite", "loop unavailable: sequencer.Loop.value not writable")
+		H.logOnce("loopwrite", "loop unavailable: sequencer.Loop.value not writable")
 		return
 	end
-	log("loop: " .. (loop and "off" or "on"))
+	H.log("loop: " .. (loop and "off" or "on"))
 end
 
 -- Shift + record (CC 10): overdub — the MPC's second record control (replace vs
 -- layer while recording over existing material).
 local function doOverdub()
-	local f = callable(mpc.sequencer, "Overdub")
+	local f = H.callable(mpc.sequencer, "Overdub")
 	if not f then
-		logOnce("overdub", "overdub unavailable: sequencer.Overdub missing")
+		H.logOnce("overdub", "overdub unavailable: sequencer.Overdub missing")
 		return
 	end
-	call(f)
-	log("overdub")
+	H.call(f)
+	H.log("overdub")
 end
 
 -- Shift + fixed length (CC 30): cycle the global automation filter type.
 local function doAutomationFilterCycle()
-	if not requireProject("automation filter") then
+	if not H.requireProject("automation filter") then
 		return
 	end
-	local f = callable(mpc.project, "AdvanceGlobalAutomationFilterType")
+	local f = H.callable(mpc.project, "AdvanceGlobalAutomationFilterType")
 	if not f then
-		logOnce("autofilter", "automation filter unavailable: project.AdvanceGlobalAutomationFilterType missing")
+		H.logOnce("autofilter", "automation filter unavailable: project.AdvanceGlobalAutomationFilterType missing")
 		return
 	end
-	call(f)
-	log("automation filter: cycled")
+	H.call(f)
+	H.log("automation filter: cycled")
 end
 
 -- Shift + < / > (CC 91/92): MPC's current track previous/next.
 local function doTrackNav(forward)
 	local field = forward and "Next" or "Previous"
-	if trackAction(field, "tracknav", "track nav") then
-		log("track: " .. (forward and "next" or "prev"))
+	if H.trackAction(field, "tracknav", "track nav") then
+		H.log("track: " .. (forward and "next" or "prev"))
 	end
 end
 
@@ -2183,8 +2210,8 @@ end
 -- track (present on track objects in 3.10.1).
 local function doPluginPreset(forward)
 	local field = forward and "NextPluginPreset" or "PrevPluginPreset"
-	if trackAction(field, "preset", "preset") then
-		log("preset: " .. (forward and "next" or "prev"))
+	if H.trackAction(field, "preset", "preset") then
+		H.log("preset: " .. (forward and "next" or "prev"))
 	end
 end
 
@@ -2194,8 +2221,8 @@ local function moveWindow(dir, n)
 	end
 	local fn = ({ left = "MoveLeft", right = "MoveRight", up = "MoveUp", down = "MoveDown" })[dir]
 	if fn then
-		call(aperture[fn], n)
-		log(fn .. "(" .. n .. ")")
+		H.call(aperture[fn], n)
+		H.log(fn .. "(" .. n .. ")")
 		padCache = {}
 		listenGrid() -- the slot properties follow the window: rebind, then repaint
 		paintAll()
@@ -2203,7 +2230,7 @@ local function moveWindow(dir, n)
 end
 
 local function probe(note, cc, value)
-	log(string.format("PROBE note=%s cc=%s value=%s", tostring(note), tostring(cc), tostring(value)))
+	H.log(string.format("PROBE note=%s cc=%s value=%s", tostring(note), tostring(cc), tostring(value)))
 	if note then
 		ledCol(note, C.white)
 	end
@@ -2244,23 +2271,23 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 		end
 		if velocity > 0 then
 			if heldFunction == "stopClip" then
-				local gc = globalPos(col, 0)
-				call(aperture and aperture.StopClipsOnTrack, gc)
-				log("StopClipsOnTrack(" .. gc .. ")")
+				local gc = H.globalPos(col, 0)
+				H.call(aperture and aperture.StopClipsOnTrack, gc)
+				H.log("StopClipsOnTrack(" .. gc .. ")")
 				paintAll()
 			elseif clipOp == "clear" then
-				local gc, gr = globalPos(col, row)
-				call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, gc, gr)
-				log(string.format("DeleteClip(%d,%d)", gc, gr))
+				local gc, gr = H.globalPos(col, row)
+				H.call(mpc.clipMatrix and mpc.clipMatrix.DeleteClip, gc, gr)
+				H.log(string.format("DeleteClip(%d,%d)", gc, gr))
 				paintAll()
 			elseif clipOp == "duplicate" then
-				local gc, gr = globalPos(col, row)
+				local gc, gr = H.globalPos(col, row)
 				if clipOrigin == nil then
 					clipOrigin = { gc, gr }
-					log(string.format("duplicate origin (%d,%d)", gc, gr))
+					H.log(string.format("duplicate origin (%d,%d)", gc, gr))
 				else
-					call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], clipOrigin[2], gc, gr)
-					log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], clipOrigin[2], gc, gr))
+					H.call(mpc.clipMatrix and mpc.clipMatrix.CopyClip, clipOrigin[1], clipOrigin[2], gc, gr)
+					H.log(string.format("CopyClip(%d,%d -> %d,%d)", clipOrigin[1], clipOrigin[2], gc, gr))
 					-- keep the origin so one source can be copied to many targets
 					-- while the duplicate button is held
 					paintAll()
@@ -2337,11 +2364,11 @@ local function ccUpDown(delta)
 			nudgeQlink(delta)
 		elseif qlinkPage == 0 and qlinkPageHasContent(1) then
 			qlinkPage = 1
-			log("qlink page 2")
+			H.log("qlink page 2")
 			paintAll()
 		elseif qlinkPage == 1 then
 			qlinkPage = 0
-			log("qlink page 1")
+			H.log("qlink page 1")
 			paintAll()
 		end
 	else
@@ -2352,7 +2379,7 @@ end
 local function armClipOp(kind)
 	clipOp = kind
 	clipOrigin = nil
-	log(
+	H.log(
 		"clip op "
 			.. kind
 			.. " armed: "
@@ -2369,7 +2396,7 @@ local function ccFunctionButton(fn)
 	elseif fn == "sends" then
 		if adjustMode == "sends" then
 			adjustSend = (adjustSend % 4) + 1
-			log("send " .. adjustSend)
+			H.log("send " .. adjustSend)
 			paintAll()
 		else
 			enterAdjust("sends")
@@ -2384,7 +2411,7 @@ local function ccFunctionButton(fn)
 		if qlinkMode then
 			if qlinkPage == 0 and qlinkPageHasContent(1) then
 				qlinkPage = 1
-				log("qlink page 2")
+				H.log("qlink page 2")
 				paintAll()
 			else
 				exitQlink()
@@ -2395,16 +2422,16 @@ local function ccFunctionButton(fn)
 	else
 		heldFunction = fn
 		adjustMode = nil
-		log("hold " .. fn)
+		H.log("hold " .. fn)
 		paintAll()
 	end
 end
 
 local function toggleFollow()
 	followMode = not followMode
-	log("follow: " .. (followMode and "on" or "off"))
+	H.log("follow: " .. (followMode and "on" or "off"))
 	if followMode then
-		followCurrentTrack(propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
+		followCurrentTrack(H.propValue(mpc.tracks and mpc.tracks.currentTrack, "Index"))
 	else
 		paintTop()
 		flushLEDs()
@@ -2412,44 +2439,44 @@ local function toggleFollow()
 end
 
 local function logStatus()
-	log("status: mode=" .. mode .. " shift=" .. tostring(shift))
+	H.log("status: mode=" .. mode .. " shift=" .. tostring(shift))
 end
 
 local function toggleProbe()
 	probeMode = not probeMode
-	log("probe mode " .. tostring(probeMode))
+	H.log("probe mode " .. tostring(probeMode))
 	paintRight()
 	flushLEDs()
 end
 
 local function stepSeqNext()
 	if pressSurfaceButton("stepSeqNext") then
-		log("step seq: next")
+		H.log("step seq: next")
 	else
-		logOnce("stepseqnext", "step seq next unavailable: controlSurface.stepSeqNext missing")
+		H.logOnce("stepseqnext", "step seq next unavailable: controlSurface.stepSeqNext missing")
 	end
 end
 
 local function openStepSeq()
-	if not requireProject("step seq") then
+	if not H.requireProject("step seq") then
 		return
 	end
 	if pressSurfaceButton("stepSeq") then
 		setMode("step")
-		log("step seq view")
+		H.log("step seq view")
 	else
-		logOnce("stepseq", "step seq unavailable: controlSurface.stepSeq missing")
+		H.logOnce("stepseq", "step seq unavailable: controlSurface.stepSeq missing")
 	end
 end
 
 local function doSave()
-	if not requireProject("save") then
+	if not H.requireProject("save") then
 		return
 	end
 	if pressSurfaceButton("save") then
-		log("save")
+		H.log("save")
 	else
-		logOnce("save", "save unavailable: controlSurface.save missing")
+		H.logOnce("save", "save unavailable: controlSurface.save missing")
 	end
 end
 
@@ -2479,7 +2506,7 @@ local PRESS = {
 	end,
 	[TOP.chord] = openPadPerformPage,
 	[TOP.custom] = function()
-		logOnce("custom", "custom button: unmapped")
+		H.logOnce("custom", "custom button: unmapped")
 	end,
 	[TOP.left] = function()
 		moveWindow("left", 1)
@@ -2488,7 +2515,7 @@ local PRESS = {
 		moveWindow("right", 1)
 	end,
 	[TOP.save] = function()
-		log("projects: TODO")
+		H.log("projects: TODO")
 	end,
 	[RIGHT.logo] = logStatus,
 	[LEFT.up] = function()
@@ -2555,7 +2582,7 @@ end
 for cc = 101, 108 do
 	local col = cc - 101
 	PRESS[cc] = function()
-		local gc = globalPos(col, 0)
+		local gc = H.globalPos(col, 0)
 		if heldFunction then
 			applyFunction(heldFunction, gc)
 		else
@@ -2581,7 +2608,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		action()
 		return
 	end
-	log("unmapped CC " .. cc .. " value " .. value)
+	H.log("unmapped CC " .. cc .. " value " .. value)
 end
 
 function LaunchpadProMK3.HandleMIDISysex(bytes)
@@ -2606,7 +2633,7 @@ function LaunchpadProMK3.HandleMIDISysex(bytes)
 		for i = 12, math.min(14, #bytes) do
 			ver[#ver + 1] = tostring(bytes:byte(i))
 		end
-		logOnce("firmware", "firmware: " .. (#ver > 0 and table.concat(ver, ".") or "unknown"))
+		H.logOnce("firmware", "firmware: " .. (#ver > 0 and table.concat(ver, ".") or "unknown"))
 	end
 	-- select layout: 00 20 29 02 0E 00 <layout> <page> 00
 	if bytes:sub(1, 6) == string.char(0x00, 0x20, 0x29, 0x02, 0x0E, 0x00) and #bytes >= 9 then
@@ -2614,7 +2641,7 @@ function LaunchpadProMK3.HandleMIDISysex(bytes)
 		local page = bytes:byte(8)
 		if priorLayout == nil and layout ~= 0x11 then
 			priorLayout, priorPage = layout, page
-			log(string.format("prior layout 0x%02x page %d", layout, page))
+			H.log(string.format("prior layout 0x%02x page %d", layout, page))
 		end
 	end
 end
@@ -2648,19 +2675,19 @@ function LaunchpadProMK3.HandleTimer()
 	if layoutQuerySent and not programmerEntered and ticks >= 1 then
 		sendLayout(0x11, 0)
 		programmerEntered = true
-		log("programmer mode")
+		H.log("programmer mode")
 	end
 	if aperture and not clipProps then
 		-- window position fallback, whichever getter this firmware has
 		for _, n in ipairs({ "GetOriginX", "GetColumn", "GetX" }) do
-			local v = call(aperture[n])
+			local v = H.call(aperture[n])
 			if type(v) == "number" then
 				originCol = v
 				break
 			end
 		end
 		for _, n in ipairs({ "GetOriginY", "GetRow", "GetY" }) do
-			local v = call(aperture[n])
+			local v = H.call(aperture[n])
 			if type(v) == "number" then
 				originRow = v
 				break
@@ -2699,19 +2726,19 @@ function LaunchpadProMK3.OnLoad()
 		or dev.clipProperties
 		or (mpc.clipMatrix and mpc.clipMatrix.clipProperties)
 	if aperture then
-		call(aperture.SetColumns, 8)
-		call(aperture.SetRows, 8)
-		call(aperture.SetLabel, "LPP3")
-		call(aperture.SetFollowsTUI, false)
-		call(aperture.Show)
-		log("aperture ok")
+		H.call(aperture.SetColumns, 8)
+		H.call(aperture.SetRows, 8)
+		H.call(aperture.SetLabel, "LPP3")
+		H.call(aperture.SetFollowsTUI, false)
+		H.call(aperture.Show)
+		H.log("aperture ok")
 	else
-		logOnce("noaperture", "aperture MISSING: clip surface disabled")
+		H.logOnce("noaperture", "aperture MISSING: clip surface disabled")
 	end
 	if clipProps then
-		log("clipProperties ok")
+		H.log("clipProperties ok")
 	else
-		logOnce("noclips", "clipProperties MISSING")
+		H.logOnce("noclips", "clipProperties MISSING")
 	end
 
 	-- register the LPP3 controls with the script
@@ -2719,7 +2746,7 @@ function LaunchpadProMK3.OnLoad()
 	if m then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
-				call(m.AddNoteToScript, 0, 10 * (padRow + 1) + col + 1)
+				H.call(m.AddNoteToScript, 0, 10 * (padRow + 1) + col + 1)
 			end
 		end
 		local ccs = {
@@ -2767,9 +2794,9 @@ function LaunchpadProMK3.OnLoad()
 			108,
 		}
 		for _, cc in ipairs(ccs) do
-			call(m.AddCCToScript, 0, cc)
+			H.call(m.AddCCToScript, 0, cc)
 		end
-		call(m.SetHandleSysex, true)
+		H.call(m.SetHandleSysex, true)
 	end
 
 	queryLayout()
@@ -2781,16 +2808,24 @@ function LaunchpadProMK3.OnLoad()
 		dev.midiOut.SendMIDISysex(string.char(0x7E, 0x7F, 0x06, 0x01), port)
 	end)
 	if not okProbe then
-		logOnce("fwprobe", "firmware probe failed")
+		H.logOnce("fwprobe", "firmware probe failed")
 	end
 
 	listenAll()
 	paintAll()
-	call(dev.timer and dev.timer.Start, 50)
-	log("loaded")
+	H.call(dev.timer and dev.timer.Start, 50)
+	H.log("loaded")
+	H.log(
+		"engine mode: "
+			.. tostring(
+				H.propValue(mpc.engineMode, "CurrentMode") or H.call(H.callable(mpc.engineMode, "GetCurrentMode"))
+			)
+			.. " popup: "
+			.. H.currentPopup()
+	)
 end
 function LaunchpadProMK3.OnUnload()
-	call(dev.timer and dev.timer.Stop)
+	H.call(dev.timer and dev.timer.Stop)
 	removeListeners()
 	exitPadsMode() -- hand the pad-mode notes back to the script before unmapping
 	padsMode = false
@@ -2806,20 +2841,20 @@ function LaunchpadProMK3.OnUnload()
 	clipOrigin = nil
 	if programmerEntered then
 		sendLayout(priorLayout or 0x04, priorPage or 0x00)
-		log("restored layout")
+		H.log("restored layout")
 	end
 	if nativeTap then
 		-- Shift was held: hand CC 6 back so the removal below unregisters the
 		-- routing OnLoad registered
 		local cs = dev.mappings and dev.mappings.controlSurface
-		call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
+		H.call(cs and cs.RemoveCCToControl, 0, TRACK.sends)
 		nativeTap = false
 	end
 	local m = dev.mappings and dev.mappings.script
 	if m then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
-				call(m.RemoveNoteToScript, 0, 10 * (padRow + 1) + col + 1)
+				H.call(m.RemoveNoteToScript, 0, 10 * (padRow + 1) + col + 1)
 			end
 		end
 		local ccs = {
@@ -2867,7 +2902,7 @@ function LaunchpadProMK3.OnUnload()
 			108,
 		}
 		for _, cc in ipairs(ccs) do
-			call(m.RemoveCCToScript, 0, cc)
+			H.call(m.RemoveCCToScript, 0, cc)
 		end
 	end
 	-- dark the surface
@@ -2924,7 +2959,7 @@ function LaunchpadProMK3.OnUnload()
 	end
 	flushLEDs()
 	if aperture then
-		call(aperture.Hide)
+		H.call(aperture.Hide)
 	end
-	log("unloaded")
+	H.log("unloaded")
 end

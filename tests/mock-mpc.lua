@@ -608,7 +608,16 @@ local mpc = {
 			record("ShowTUIFeedback", s)
 		end,
 	},
-	engineMode = { CurrentMode = prop("clip") },
+	engineMode = {
+		CurrentMode = prop("clip"),
+		CurrentPopup = prop("No Popup"),
+		GetCurrentMode = function()
+			return "clip"
+		end,
+		GetCurrentPopup = function()
+			return "No Popup"
+		end,
+	},
 }
 
 local dev = {

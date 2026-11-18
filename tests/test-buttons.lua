@@ -127,6 +127,16 @@ L.HandleMIDICC(0, 40, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: quantize: no project loaded", "quantize guarded without a project")
 assert_eq(mock.count("quantizeApply.Press"), beforeQ, "quantizeApply not pressed without a project")
 L.HandleMIDICC(0, 40, 0)
+-- An open dialog (e.g. the New Project page) blocks project-scoped actions:
+-- the MPC's native side crashes there, so the script must not call into it.
+mock.mpc.engineMode.CurrentPopup:set("New Project")
+local beforeP = mock.count("quantizeApply.Press")
+L.HandleMIDICC(0, 40, 127)
+assert_eq(lastLog(), "LaunchpadProMK3: quantize: dialog open (New Project)", "quantize guarded while a dialog is open")
+assert_eq(mock.count("quantizeApply.Press"), beforeP, "quantizeApply not pressed while a dialog is open")
+L.HandleMIDICC(0, 40, 0)
+mock.mpc.engineMode.CurrentPopup:set("No Popup")
+
 -- empty project (0 tracks) is still a project: quantize runs
 mock.mpc.currentSequence = savedSeq
 mock.mpc.tracks = savedTracks
