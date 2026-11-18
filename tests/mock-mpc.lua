@@ -508,6 +508,15 @@ local mpc = {
 	controlSurface = {
 		pads = padsControl,
 		qlinks = qlinks,
+		record = {
+			Press = function()
+				record("record.Press")
+				sequencer.RecordState.value = not sequencer.RecordState.value
+			end,
+			Release = function()
+				record("record.Release")
+			end,
+		},
 		quantizeApply = {
 			Press = function()
 				record("quantizeApply.Press")

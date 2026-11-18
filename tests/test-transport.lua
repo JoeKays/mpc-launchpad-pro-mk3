@@ -7,6 +7,17 @@ _G.LaunchpadProMK3 = mock.dev
 dofile(os.getenv("LPP3_LUA") or "script/LaunchpadProMK3.lua")
 local L = LaunchpadProMK3
 
+-- capture the script's log output so the log strings can be asserted
+local logs = {}
+local realPrint = print
+_G.print = function(msg)
+	logs[#logs + 1] = tostring(msg)
+end
+
+local function lastLog()
+	return logs[#logs] or ""
+end
+
 local function assert_eq(a, b, msg)
 	if a ~= b then
 		error((msg or "") .. ": expected " .. tostring(b) .. ", got " .. tostring(a))
@@ -21,8 +32,14 @@ mock.sequencer.IsPlaying = function()
 end
 L.HandleMIDICC(0, 20, 127) -- play while playing -> stop
 assert_eq(mock.count("Stop"), 1, "Stop")
-L.HandleMIDICC(0, 10, 127) -- record
-assert_eq(mock.count("Record"), 1, "Record")
+L.HandleMIDICC(0, 10, 127) -- record -> arm (delegates to the MPC's REC button)
+assert_eq(mock.count("record.Press"), 1, "record button pressed to arm")
+assert_eq(lastLog(), "LaunchpadProMK3: record: armed", "armed logged")
+L.HandleMIDICC(0, 10, 0)
+L.HandleMIDICC(0, 10, 127) -- record again -> disarm
+assert_eq(mock.count("record.Press"), 2, "record button pressed to disarm")
+assert_eq(lastLog(), "LaunchpadProMK3: record: disarmed", "disarmed logged")
+L.HandleMIDICC(0, 10, 0)
 L.HandleMIDICC(0, 90, 127) -- shift on
 L.HandleMIDICC(0, 1, 127) -- shift + rec arm = undo
 assert_eq(mock.count("Undo"), 1, "Undo")

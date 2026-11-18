@@ -2042,6 +2042,34 @@ local function doTransport(fn)
 	end
 end
 
+-- Record (CC 10): arm/disarm, matching the MPC's own REC button — the first
+-- press arms recording (recording starts when the transport runs or a clip is
+-- triggered), the next press disarms. Delegates to controlSurface.record so the
+-- MPC's record state machine does the work; falls back to Record/RecordOff.
+local function recordArmed()
+	local st = propValue(mpc.sequencer, "RecordState")
+	if type(st) == "number" then
+		return st ~= 0
+	end
+	return st == true
+end
+
+local function doRecordToggle()
+	local armed = recordArmed()
+	if pressSurfaceButton("record") then
+		log("record: " .. (armed and "disarmed" or "armed"))
+		return
+	end
+	local name = armed and "RecordOff" or "Record"
+	local f = callable(mpc.sequencer, name)
+	if not f then
+		logOnce("record", "record unavailable: sequencer." .. name .. " missing")
+		return
+	end
+	call(f)
+	log("record: " .. (armed and "disarmed" or "armed"))
+end
+
 -- Shift + play (CC 20): loop on/off (Loop is a userdata property with .value).
 local function doLoopToggle()
 	local sq = mpc.sequencer
@@ -2408,9 +2436,7 @@ local PRESS = {
 	[LEFT.play] = function()
 		doTransport("play")
 	end,
-	[LEFT.record] = function()
-		doTransport("record")
-	end,
+	[LEFT.record] = doRecordToggle,
 	[LEFT.quantize] = doQuantize,
 	[LEFT.duplicate] = function()
 		armClipOp("duplicate")

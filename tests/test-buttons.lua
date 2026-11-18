@@ -155,7 +155,7 @@ L.HandleMIDICC(0, 20, 127)
 assert_eq(mock.count("Play"), 1, "play without shift")
 L.HandleMIDICC(0, 20, 0)
 L.HandleMIDICC(0, 10, 127)
-assert_eq(mock.count("Record"), 1, "record without shift")
+assert_eq(mock.count("record.Press"), 1, "record without shift arms via the MPC REC button")
 L.HandleMIDICC(0, 10, 0)
 L.HandleMIDICC(0, 91, 127)
 assert_eq(mock.count("MoveLeft"), 1, "window left without shift")
@@ -178,6 +178,7 @@ L.HandleMIDICC(0, 30, 0)
 mock.mpc.project = savedProject
 
 -- Loop/overdub LED indicators: play orange while loop is on, record orange while overdubbing.
+mock.sequencer.RecordState:set(false) -- earlier record presses left recording armed
 mock.sequencer.Loop:set(true)
 assert_eq(mock.leds[20][1], 127, "play button orange while loop enabled")
 assert_eq(mock.leds[20][2], 60, "play button orange g while loop enabled")
