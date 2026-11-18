@@ -244,8 +244,7 @@ with the `Colour.value` property as fallback (ARGB int, alpha ignored, scaled to
 The note button is white while the mode is open, lighter grey when `controlSurface.pads`
 and `mappings.pads` exist, off otherwise.
 
-CC 96 (custom) is a stub (track mutes live on the CC 2 hold-function; Capture MIDI
-lives on Shift + record).
+CC 96 (custom) is a stub (track mutes live on the CC 2 hold-function).
 
 If the mappings are missing the mode button stays off and pressing it changes nothing
 (the surface keeps today's behaviour).
@@ -284,7 +283,7 @@ Primary = row trigger (scene launch); Shift = the label functions.
 | 93 | session | clip mode; Shift = toggle follow-current-track (off by default). LED: cyan while follow is on |
 | 94 | note | MPC pads mode: the bottom-left 4x4 quadrant mirrors the MPC pad colours and plays the MPC pads; press again to exit. Shift = previous plugin preset (`currentTrack.PrevPluginPreset`) |
 | 95 | chord | opens the MPC's **Pad Perform page** on screen — the pad chord/scale performance modes with their key and scale settings — via `controlSurface.padPerform`; works inside and outside pads mode; Shift = next plugin preset (`currentTrack.NextPluginPreset`) |
-| 96 | custom | stub (track mutes live on the CC 2 hold-function; Capture MIDI lives on Shift + record) |
+| 96 | custom | stub (track mutes live on the CC 2 hold-function) |
 | 97 | sequencer | opens the MPC's step sequencer view (`controlSurface.stepSeq`); Shift = next bar (`controlSurface.stepSeqNext`) |
 | 98 | projects/save | projects (stub); Shift = save (`controlSurface.save`) |
 
@@ -292,7 +291,7 @@ Primary = row trigger (scene launch); Shift = the label functions.
 
 | CC | Label | Script action |
 |---|---|---|
-| 10 | record/capture midi | `sequencer.Record`; Shift = **Capture MIDI** (`clipMatrix.InsertRowAndCapture`, matching the MPC's Shift+Record) — inserts a clip row and retro-captures what was just played. LED: red while recording, orange while overdubbing |
+| 10 | record | press = arm/disarm recording via the MPC's own REC button (`controlSurface.record`; recording starts when the transport runs); Shift = overdub (`sequencer.Overdub`). LED: red while armed/recording, orange while overdubbing |
 | 20 | play | `IsPlaying` ? `Stop` : `Play`; Shift = loop toggle (`sequencer.Loop.value`). LED: green while playing, orange while loop is enabled, dim when stopped |
 | 30 | fixed length | stub; Shift = cycle the global automation filter (`project.AdvanceGlobalAutomationFilterType`) |
 | 40 | quantize/record quantize | applies quantize via `controlSurface.quantizeApply.Press()` then `Release()` |

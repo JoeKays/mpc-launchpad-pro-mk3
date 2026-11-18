@@ -106,9 +106,9 @@ assert_eq(lastLog(), "LaunchpadProMK3: loop: off", "loop off")
 assert_eq(mock.sequencer.Loop.value, false, "Loop.value false")
 L.HandleMIDICC(0, 20, 0)
 
-L.HandleMIDICC(0, 10, 127) -- shift + record = capture MIDI (MPC hardware convention)
-assert_eq(mock.count("InsertRowAndCapture"), 1, "InsertRowAndCapture called")
-assert_eq(lastLog(), "LaunchpadProMK3: capture: row inserted, MIDI captured to clip", "capture logged")
+L.HandleMIDICC(0, 10, 127) -- shift + record = overdub
+assert_eq(mock.count("Overdub"), 1, "Overdub called")
+assert_eq(lastLog(), "LaunchpadProMK3: overdub", "overdub logged")
 L.HandleMIDICC(0, 10, 0)
 
 L.HandleMIDICC(0, 40, 127) -- quantize applies (no Shift variant)
@@ -143,11 +143,10 @@ assert_eq(lastLog(), "LaunchpadProMK3: preset: next", "preset next logged")
 L.HandleMIDICC(0, 95, 0)
 L.HandleMIDICC(0, 90, 0)
 
--- CC 96 (custom) is back to a stub: capture MIDI lives on Shift + record.
+-- CC 96 (custom) is a stub.
 mock.reset()
 L.HandleMIDICC(0, 96, 127)
 assert_eq(mock.count("InsertRowAndCapture"), 0, "custom button does not capture")
-assert_eq(mock.count("keyboardControl.Press"), 0, "no keyboard page")
 L.HandleMIDICC(0, 96, 0)
 
 -- without Shift the buttons keep their primary functions
@@ -252,15 +251,15 @@ L.HandleMIDICC(0, 20, 0)
 L.HandleMIDICC(0, 90, 0)
 mock.mpc.sequencer.Loop = savedLoop
 
--- Capture degrade: without clipMatrix.InsertRowAndCapture, Shift + record logs once and harms nothing.
-local savedCM = mock.mpc.clipMatrix
-mock.mpc.clipMatrix = {}
+-- Overdub degrade: without sequencer.Overdub, Shift + record logs once and harms nothing.
+local savedOverdub = mock.mpc.sequencer.Overdub
+mock.mpc.sequencer.Overdub = nil
 L.HandleMIDICC(0, 90, 127)
 L.HandleMIDICC(0, 10, 127)
-assert_eq(lastLog(), "LaunchpadProMK3: capture unavailable: clipMatrix.InsertRowAndCapture missing", "capture degrade")
+assert_eq(lastLog(), "LaunchpadProMK3: overdub unavailable: sequencer.Overdub missing", "overdub degrade")
 L.HandleMIDICC(0, 10, 0)
 L.HandleMIDICC(0, 90, 0)
-mock.mpc.clipMatrix = savedCM
+mock.mpc.sequencer.Overdub = savedOverdub
 
 L.HandleMIDICC(0, 90, 127)
 local savedNext = mock.mpc.tracks.currentTrack.Next

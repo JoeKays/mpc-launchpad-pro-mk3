@@ -20,7 +20,7 @@ L.OnLoad()
 
 -- The note button is available (lighter grey); custom (CC 96) is a stub and stays off.
 assert_eq(mock.leds[94][1], 60, "note button available")
-assert_eq(mock.leds[96][1], 0, "custom button off (stub: capture on Shift+record)")
+assert_eq(mock.leds[96][1], 0, "custom button off (stub)")
 
 -- Enter pads mode (CC 94): the 16 quadrant notes move from the script to the MPC pads.
 -- A stopped clip sits under note 85 (grid col 4, MPC row 0) so the mode visibly darks it;
@@ -107,11 +107,11 @@ assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
 
--- CC 96 is a stub (capture MIDI lives on Shift + record; mutes live on CC 2 hold).
+-- CC 96 is a stub (mutes live on CC 2 hold).
 mock.reset()
 L.HandleMIDICC(0, 96, 127)
 assert_eq(mock.count("AddNoteToTrackMute"), 0, "no mute binding on CC 96")
-assert_eq(mock.count("InsertRowAndCapture"), 0, "CC 96 does not capture")
+assert_eq(mock.count("InsertRowAndCapture"), 0, "CC 96 does not capture (capture removed)")
 L.HandleMIDINoteOn(0, 21, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch unaffected by CC 96")
 
