@@ -33,6 +33,10 @@ If you have a different build, pass `MPC_SALT` (36 chars) instead of a binary.
 
 ## 3. Copy to the device
 
+The release zip (`mpc-launchpad-pro-mk3-v<version>.zip`) contains the signed
+`.ini`, the minified `.lua`, this guide, the README and the generated
+`MANUAL.md` control reference.
+
 Search dirs (FINDINGS §1):
 
 - `/usr/share/Akai/SME0/Devices` (read-only rootfs; not for user scripts)

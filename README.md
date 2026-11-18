@@ -88,6 +88,7 @@ track navigation, plugin presets and the firmware probe are implemented and host
 | `docs/PATTERNS.md` | reusable patterns from the reference controllers |
 | `docs/MAPPING.md` | the button/pad mapping this script implements |
 | `docs/INSTALL.md` | install + signing procedure |
+| `tools/make-release.sh` | builds and packages the release zip (script + manual + docs) |
 | `docs/DEVICE-TEST-PLAN.md` | on-hardware test steps |
 | `docs/LIMITATIONS.md` | what the script cannot do |
 | `docs/REVIEW.md` | review of the implementation against the API contract |
