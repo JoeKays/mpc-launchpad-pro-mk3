@@ -25,9 +25,9 @@
 --   top row CC 90-98     90 shift, 91 < (Shift = track prev), 92 > (Shift = track next),
 --                        93 session (clip grid), 94 note = MPC pads mode (Shift = preset prev),
 --                        95 chord = MPC Pad Perform page (Shift = preset next),
---                        96 custom = track mute mode,
+--                        96 custom = stub (capture MIDI lives on Shift + record),
 --                        97 sequencer, 98 projects/save
---   left column CC 10-80 10 record (Shift = overdub), 20 play (Shift = loop toggle),
+--   left column CC 10-80 10 record (Shift = capture MIDI), 20 play (Shift = loop toggle),
 --                        30 fixed length (Shift = automation filter cycle),
 --                        40 quantize (Shift = quantiser toggle), 50 duplicate/double, 60 clear,
 --                        70 down, 80 up
@@ -1169,7 +1169,7 @@ local function paintTop()
 		note = C.available
 	end
 	local chord = C.available -- opens the MPC's Pad Perform page on press
-	local custom = C.off -- stub (mutes live on the CC 2 hold-function)
+	local custom = C.off -- stub (capture MIDI lives on Shift + record)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
 	ledRGB(TOP.note, note[1], note[2], note[3])
@@ -2028,16 +2028,10 @@ local function doLoopToggle()
 	log("loop: " .. (loop and "off" or "on"))
 end
 
--- Shift + record (CC 10): overdub (a plain sequencer function).
-local function doOverdub()
-	local sq = mpc.sequencer
-	if not (sq and type(sq.Overdub) == "function") then
-		logOnce("overdub", "overdub unavailable: sequencer.Overdub missing")
-		return
-	end
-	call(sq.Overdub)
-	log("overdub")
-end
+-- Shift + record (CC 10): Capture MIDI — matches the MPC hardware convention
+-- (Shift + Record = capture), inserting a clip row and retro-capturing what was
+-- just played (clipMatrix.InsertRowAndCapture). doCaptureMidi is defined with the
+-- clip helpers below.
 
 -- Shift + fixed length (CC 30): cycle the global automation filter type.
 local function doAutomationFilterCycle()
@@ -2087,6 +2081,18 @@ local function moveWindow(dir, n)
 		listenGrid() -- the slot properties follow the window: rebind, then repaint
 		paintAll()
 	end
+end
+
+-- Custom button (CC 96): Capture MIDI — the clip workflow's retro-capture of what
+-- was just played into a new clip row (same as the on-screen Capture button).
+local function doCaptureMidi()
+	local cm = mpc.clipMatrix or mpc.masterClipMatrix
+	if not (cm and type(cm.InsertRowAndCapture) == "function") then
+		logOnce("capture", "capture unavailable: clipMatrix.InsertRowAndCapture missing")
+		return
+	end
+	call(cm.InsertRowAndCapture)
+	log("capture: row inserted, MIDI captured to clip")
 end
 
 local function probe(note, cc, value)
@@ -2271,7 +2277,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.custom then
-		logOnce("custom", "custom mode: TODO (mutes live on the CC 2 hold-function)")
+		logOnce("custom", "custom button: unmapped (capture MIDI lives on Shift + record)")
 		return
 	end
 	for row = 0, 7 do
@@ -2348,7 +2354,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	end
 	if cc == LEFT.record then
 		if shift then
-			doOverdub()
+			doCaptureMidi()
 		else
 			doTransport("record")
 		end

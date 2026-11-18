@@ -55,6 +55,10 @@ local clipMatrix = {
 	CopyClip = function(fc, fr, tc, tr)
 		record("CopyClip", fc, fr, tc, tr)
 	end,
+	InsertRowAndCapture = function()
+		record("InsertRowAndCapture")
+		return true
+	end,
 }
 
 -- tracks

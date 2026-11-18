@@ -33,7 +33,8 @@ track navigation, plugin presets and the firmware probe are implemented and host
   follows MPC's current track (`currentTrack.Index` listener moves the window; the
   master track shows the Master matrix).
 - **Transport**: 20 play/stop toggle, 10 record; Shift + CC 1/2 = undo/redo,
-  Shift + 20 = loop on/off, Shift + 10 = overdub, Shift + 30 = automation filter cycle.
+  Shift + 20 = loop on/off, Shift + 10 = Capture MIDI (retro-capture what you just
+  played into a clip row, matching the MPC's Shift+Record), Shift + 30 = automation filter cycle.
   The play LED shows loop state (green playing, orange loop armed) and the record LED
   shows overdub (red recording, orange overdubbing).
 - **Track row**: CC 101-108 selects the track under that grid column (follows the window).
