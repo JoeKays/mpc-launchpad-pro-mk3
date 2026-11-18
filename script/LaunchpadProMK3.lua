@@ -1262,8 +1262,9 @@ local function paintTop()
 			return C.dim
 		end
 	end
+	local projectOn = H.projectLoaded()
 	-- session shows cyan while grid-follow is enabled so the toggle state is visible
-	local session = followMode and C.cyan or modeColour("clip")
+	local session = (not projectOn and C.off) or (followMode and C.cyan) or modeColour("clip")
 	local sequencer = modeColour("step")
 	local note = C.off
 	if padsMode then
@@ -1271,7 +1272,7 @@ local function paintTop()
 	elseif padsLayoutAvailable() and H.projectLoaded() then
 		note = C.available
 	end
-	local chord = C.available -- opens the MPC's Pad Perform page on press
+	local chord = projectOn and C.available or C.off -- opens the MPC's Pad Perform page on press
 	local custom = C.off -- stub
 	ledCol(TOP.session, session)
 	ledCol(TOP.sequencer, sequencer)
@@ -1281,12 +1282,11 @@ local function paintTop()
 	ledCol(TOP.left, C.dim)
 	ledCol(TOP.right, C.dim)
 	local saveAvailable = mpc.controlSurface ~= nil and mpc.controlSurface.save ~= nil
-	ledRGB(
-		TOP.save,
-		saveAvailable and C.available[1] or C.dim[1],
-		saveAvailable and C.available[2] or C.dim[2],
-		saveAvailable and C.available[3] or C.dim[3]
-	)
+	if not projectOn then
+		ledCol(TOP.save, C.off)
+	else
+		ledCol(TOP.save, saveAvailable and C.available or C.dim)
+	end
 	ledRGB(
 		TOP.shift,
 		shift and C.white[1] or C.dim[1],
@@ -1331,23 +1331,14 @@ local function paintLeft()
 	else
 		ledCol(LEFT.quantize, C.white) -- available, quantiser off
 	end
+	local projectOn = H.projectLoaded()
 	local nudgeOn = adjustMode ~= nil or tempoMode or swingMode or qlinkMode
 	local pageColour = tempoMode and C.white
 		or (swingMode and C.yellow or (qlinkMode and qlinkColour(qlinkForColumn(0) or 0) or H.adjustColour()))
-	ledCol(LEFT.duplicate, C.white)
-	ledCol(LEFT.clear, C.white)
-	ledRGB(
-		LEFT.down,
-		nudgeOn and pageColour[1] or C.white[1],
-		nudgeOn and pageColour[2] or C.white[2],
-		nudgeOn and pageColour[3] or C.white[3]
-	)
-	ledRGB(
-		LEFT.up,
-		nudgeOn and pageColour[1] or C.white[1],
-		nudgeOn and pageColour[2] or C.white[2],
-		nudgeOn and pageColour[3] or C.white[3]
-	)
+	ledCol(LEFT.duplicate, projectOn and C.white or C.off)
+	ledCol(LEFT.clear, projectOn and C.white or C.off)
+	ledCol(LEFT.down, (not projectOn and C.off) or (nudgeOn and pageColour or C.white))
+	ledCol(LEFT.up, (not projectOn and C.off) or (nudgeOn and pageColour or C.white))
 end
 
 local function paintRight()

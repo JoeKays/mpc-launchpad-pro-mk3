@@ -151,6 +151,8 @@ L.HandleMIDICC(0, 4, 127) -- function button = volume menu
 assert_eq(lastLog(), "LaunchpadProMK3: volume menu: dialog open (New Project)", "volume menu guarded")
 L.HandleMIDICC(0, 4, 0)
 mock.mpc.engineMode.CurrentPopup:set("No Popup")
+L.HandleMIDICC(0, 90, 0)
+
 L.HandleMIDICC(0, 90, 127) -- shift back on for the following shift-function tests
 
 -- empty project (0 tracks) is still a project: quantize runs
@@ -163,6 +165,24 @@ mock.sequencer.GetBPM = savedGetBPM
 L.HandleMIDICC(0, 40, 127)
 assert_eq(lastLog(), "LaunchpadProMK3: quantize applied", "empty project still quantizes")
 L.HandleMIDICC(0, 40, 0)
+
+-- Without a project the project-scoped LEDs are off (session, chord, projects,
+-- duplicate, clear, up, down). Paint once with the project loaded so the change
+-- is a visible frame (the LED cache suppresses unchanged colours).
+L.OnLoad() -- fresh paint: clears the LED cache so every colour is sent once
+assert_eq(mock.leds[93][1], 127, "session white with a project")
+assert_eq(mock.leds[50][1], 127, "duplicate white with a project")
+mock.mpc.engineMode.CurrentPopup:set("New Project")
+L.HandleMIDICC(0, 90, 127) -- repaint the top row with the dialog open
+mock.sequencer.Loop:set(false) -- repaint the left column
+assert_eq(mock.leds[93][1], 0, "session off without a project")
+assert_eq(mock.leds[95][1], 0, "chord off without a project")
+assert_eq(mock.leds[98][1], 0, "projects off without a project")
+assert_eq(mock.leds[50][1], 0, "duplicate off without a project")
+assert_eq(mock.leds[60][1], 0, "clear off without a project")
+assert_eq(mock.leds[70][1], 0, "down off without a project")
+assert_eq(mock.leds[80][1], 0, "up off without a project")
+mock.mpc.engineMode.CurrentPopup:set("No Popup")
 
 L.HandleMIDICC(0, 30, 127) -- shift + fixed length = automation filter cycle
 assert_eq(mock.count("AdvanceGlobalAutomationFilterType"), 1, "filter cycle called")
