@@ -2396,23 +2396,27 @@ local function shiftPress()
 	flushLEDs()
 end
 
-local function unmappedCustom()
-	logOnce("custom", "custom button: unmapped")
-end
-
 -- Plain press actions (Shift held: SHIFT_PRESS wins when it has an entry).
 local PRESS = {
 	[TOP.shift] = shiftPress,
 	[TOP.session] = function()
 		setMode("clip")
 	end,
-	[TOP.sequencer] = openStepSeq,
+	[TOP.sequencer] = function()
+		if probeMode then
+			dumpSequenceProbe()
+			return
+		end
+		openStepSeq()
+	end,
 	[TOP.note] = function()
 		togglePadsMode()
 		paintAll()
 	end,
 	[TOP.chord] = openPadPerformPage,
-	[TOP.custom] = unmappedCustom,
+	[TOP.custom] = function()
+		logOnce("custom", "custom button: unmapped")
+	end,
 	[TOP.left] = function()
 		moveWindow("left", 1)
 	end,
