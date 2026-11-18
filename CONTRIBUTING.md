@@ -42,6 +42,12 @@ build this project. They are gitignored and contain local paths.
 
 ## Device .ini constraints (MPC 3.10.1)
 
-- `scriptVersion` must be a single-dot `MAJOR.MINOR` value (e.g. `1.2`, like Akai's
-  own scripts). A semver string such as `1.2.0` makes the loader **silently skip the
-  script** — no log line, no load. Device-verified.
+- `scriptVersion` must be a single-dot `MAJOR.MINOR` value. A semver string such as
+  `1.2.0` makes the loader **silently skip the script** — no log line, no load.
+  Additionally the loader can **reject a minor it doesn't know** the same silent
+  way: `1.2` was accepted on one OS state and later silently refused (verified by
+  probe scripts that loaded with `1.0` but not `1.2`). Use `1.0`, exactly like
+  Akai's reference script. Device-verified.
+- The loader matches `input=`/`output=` against connected port names and runs the
+  script's chunk only when a port matches; keep one exact JUCE port name per line
+  (e.g. `Launchpad Pro MK3 LPProMK3 MIDI`), like the reference ini.
