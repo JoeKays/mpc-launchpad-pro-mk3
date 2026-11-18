@@ -949,6 +949,9 @@ local function nudgeQlink(delta)
 end
 
 local function enterQlink()
+	if not H.requireProject("qlink page") then
+		return
+	end
 	local cs = mpc.controlSurface
 	if not (cs and cs.qlinks) then
 		H.logOnce("noqlinks", "qlink page unavailable: controlSurface.qlinks missing")
@@ -1174,6 +1177,9 @@ end
 local function paintTrack()
 	-- CC 1-8: function buttons; the held or adjusted one bright, others dim.
 	local function fnAvailable(fn)
+		if not H.projectLoaded() then
+			return false -- no project / dialog open: project-scoped menus are unavailable
+		end
 		if fn == "device" then
 			local cs = mpc.controlSurface
 			return (cs and cs.qlinks ~= nil) or (mpc.sequencer ~= nil and mpc.sequencer.SetBPM ~= nil)
@@ -1262,7 +1268,7 @@ local function paintTop()
 	local note = C.off
 	if padsMode then
 		note = (padsLayout == "pads64") and C.cyan or C.white
-	elseif padsLayoutAvailable() then
+	elseif padsLayoutAvailable() and H.projectLoaded() then
 		note = C.available
 	end
 	local chord = C.available -- opens the MPC's Pad Perform page on press
@@ -1687,6 +1693,9 @@ end
 -- layout is never offered (chromatic on a drum program is silent, and the drum
 -- grid is meaningless on a synth track).
 local function togglePadsMode()
+	if not padsMode and not H.requireProject("pads mode") then
+		return
+	end
 	if not padsMode then
 		local layout, trackType = firstLayoutForTrack()
 		padsLayout = layout
@@ -1905,6 +1914,9 @@ local function nudgeAdjust(delta)
 end
 
 local function enterAdjust(newMode)
+	if not H.requireProject(newMode .. " menu") then
+		return
+	end
 	exitPadsMode() -- the fader menus need the whole grid
 	tempoMode = false
 	swingMode = false
@@ -2067,6 +2079,9 @@ local function doShiftFunction(fn)
 			doTapTempo()
 		end
 	elseif fn == "device" then
+		if not tempoMode and not H.requireProject("tempo page") then
+			return
+		end
 		exitPadsMode() -- the tempo page needs the whole grid
 		adjustMode = nil
 		swingMode = false
@@ -2081,6 +2096,9 @@ local function doShiftFunction(fn)
 		paintAll()
 		flushLEDs()
 	elseif fn == "stopClip" then
+		if not swingMode and not H.requireProject("swing page") then
+			return
+		end
 		exitPadsMode() -- the swing page needs the whole grid
 		adjustMode = nil
 		tempoMode = false

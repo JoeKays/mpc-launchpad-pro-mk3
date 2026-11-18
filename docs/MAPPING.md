@@ -244,6 +244,13 @@ with the `Colour.value` property as fallback (ARGB int, alpha ignored, scaled to
 The note button is white while the mode is open, lighter grey when `controlSurface.pads`
 and `mappings.pads` exist, off otherwise.
 
+Project-scoped pages (Q-Link, volume/pan/sends menus, pads mode, tempo page,
+swing page, step seq, save, quantize) refuse to open while a dialog owns the UI
+or no project is loaded: `engineMode.CurrentPopup` is anything but "No Popup"
+(New Project, browser, ...). Each refusal logs once, e.g.
+`qlink page: dialog open (New Project)`; the note/function-button availability
+LEDs go off in that state.
+
 CC 96 (custom) is a stub (track mutes live on the CC 2 hold-function).
 
 If the mappings are missing the mode button stays off and pressing it changes nothing

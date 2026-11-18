@@ -137,6 +137,22 @@ assert_eq(mock.count("quantizeApply.Press"), beforeP, "quantizeApply not pressed
 L.HandleMIDICC(0, 40, 0)
 mock.mpc.engineMode.CurrentPopup:set("No Popup")
 
+-- While a dialog is open every project-scoped page refuses to open.
+mock.mpc.engineMode.CurrentPopup:set("New Project")
+L.HandleMIDICC(0, 90, 0) -- shift off: test the plain page buttons
+mock.reset()
+L.HandleMIDICC(0, 7, 127) -- device = Q-Link page
+assert_eq(lastLog(), "LaunchpadProMK3: qlink page: dialog open (New Project)", "qlink page guarded")
+L.HandleMIDICC(0, 7, 0)
+L.HandleMIDICC(0, 94, 127) -- note = pads mode
+assert_eq(lastLog(), "LaunchpadProMK3: pads mode: dialog open (New Project)", "pads mode guarded")
+L.HandleMIDICC(0, 94, 0)
+L.HandleMIDICC(0, 4, 127) -- function button = volume menu
+assert_eq(lastLog(), "LaunchpadProMK3: volume menu: dialog open (New Project)", "volume menu guarded")
+L.HandleMIDICC(0, 4, 0)
+mock.mpc.engineMode.CurrentPopup:set("No Popup")
+L.HandleMIDICC(0, 90, 127) -- shift back on for the following shift-function tests
+
 -- empty project (0 tracks) is still a project: quantize runs
 mock.mpc.currentSequence = savedSeq
 mock.mpc.tracks = savedTracks
