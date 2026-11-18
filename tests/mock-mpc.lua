@@ -536,6 +536,14 @@ local mpc = {
 				record("keyboardControl.Release")
 			end,
 		},
+		padPerform = {
+			Press = function()
+				record("padPerform.Press")
+			end,
+			Release = function()
+				record("padPerform.Release")
+			end,
+		},
 		stepSeq = {
 			Press = function()
 				record("stepSeq.Press")

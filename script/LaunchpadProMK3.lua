@@ -24,7 +24,7 @@
 --                        59 velocity, 49 probability, 39 mutation, 29 micro step, 19 print to clip
 --   top row CC 90-98     90 shift, 91 < (Shift = track prev), 92 > (Shift = track next),
 --                        93 session (clip grid), 94 note = MPC pads mode (Shift = preset prev),
---                        95 chord = MPC Keyboard page, key/scale (Shift = preset next),
+--                        95 chord = MPC Pad Perform page (Shift = preset next),
 --                        96 custom = track mute mode,
 --                        97 sequencer, 98 projects/save
 --   left column CC 10-80 10 record (Shift = overdub), 20 play (Shift = loop toggle),
@@ -1168,7 +1168,7 @@ local function paintTop()
 	elseif padsLayoutAvailable() then
 		note = C.available
 	end
-	local chord = C.available -- opens the MPC's Keyboard page (key/scale) on press
+	local chord = C.available -- opens the MPC's Pad Perform page on press
 	local custom = C.off -- stub (mutes live on the CC 2 hold-function)
 	ledRGB(TOP.session, session[1], session[2], session[3])
 	ledRGB(TOP.sequencer, sequencer[1], sequencer[2], sequencer[3])
@@ -1436,8 +1436,8 @@ end
 
 -- Exit pads mode: hand the 16 notes back to the script (the caller repaints the clip grid).
 -- pressSurfaceButton drives the MPC's own control-surface buttons. CC 95 (chord)
--- opens the MPC's Keyboard page — the on-screen page that carries the key and
--- scale selection (plus chords settings) — via controlSurface.keyboardControl.
+-- opens the MPC's Pad Perform page — the on-screen page with the pad chord/scale
+-- performance modes and their key/scale settings — via controlSurface.padPerform.
 
 local function pressSurfaceButton(name)
 	local b = mpc.controlSurface and mpc.controlSurface[name]
@@ -1460,13 +1460,13 @@ padsLayoutAvailable = function()
 	return type(pads.AddNoteToMpcPad) == "function"
 end
 
-local function openKeyboardPage()
-	-- Opens the MPC's Keyboard page: on-screen keyboard with the KEY and SCALE
-	-- selection (and the chords settings) — select key/scale on the MPC screen.
-	if pressSurfaceButton("keyboardControl") then
-		log("keyboard page (key/scale) open on MPC")
+local function openPadPerformPage()
+	-- Opens the MPC's Pad Perform page: pad chord modes with their key/scale
+	-- selection on the MPC screen.
+	if pressSurfaceButton("padPerform") then
+		log("pad perform page open on MPC")
 	else
-		logOnce("keypage", "keyboardControl unavailable on this MPC")
+		logOnce("padperform", "padPerform unavailable on this MPC")
 	end
 end
 
@@ -2262,7 +2262,7 @@ function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 		return
 	end
 	if cc == TOP.chord then
-		openKeyboardPage()
+		openPadPerformPage()
 		return
 	end
 	if cc == TOP.note then
