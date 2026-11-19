@@ -61,3 +61,16 @@ Firmware: MPC 3.10.1.8 (build 38fdde70994). The hard walls are from
 - Missing `mpc.controlSurface.qlinks` → CC 7 logs once and does not open the Q-Link page; Shift + CC 7 (tempo page) and everything else continue.
 - Every optional API is behind `pcall`/nil checks; failures log once and continue.
 - Missing `mappings.pads` / `mappings.tracks.mutes` → the CC 94/96 mode buttons stay off and the modes do not enter; no crash.
+
+## MIDI routing (2024-11 backport from the Mini)
+
+The controller port is a normal MPC MIDI input: any note the script does not
+CONSUME reaches every track whose input includes the port (All Inputs / armed /
+monitored tracks double-feed). `AddNoteToScript` consumes; a bare
+`AddNoteToMpcPad` fires the pad but does NOT consume — the stock MPK dodges
+this by sending pads on channel 9, where no track listens. The Launchpad cannot
+change its programmer-mode channel, so pads mode keeps the script bindings:
+the pad binding fires the program pad while the script binding consumes the
+note (the `padsMode` early return makes the parallel dispatch safe). Journal
+proof: `pad note consumed by script binding`. Reported on the Mini hardware;
+the Pro shares the identical code path, so the fix was backported.

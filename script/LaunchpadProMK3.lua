@@ -100,7 +100,7 @@ local ACTIONS = {
 	[92] = { label = "Right", plain = "move the clip window right", shift = "next track" },
 	[93] = { label = "Session", plain = "clip grid (leaves every page)", shift = "toggle follow-current-track" },
 	[94] = { label = "Note", plain = "MPC pads mode (layout from the track type)", shift = "previous plugin preset" },
-	[95] = { label = "Chord", plain = "open the MPC Pad Perform page", shift = "next plugin preset" },
+	[95] = { label = "Chord", plain = "play the track's pads from the grid — kits plainly, melodic tracks with Pad Perform chords (repeat: leave)", shift = "next plugin preset" },
 	[96] = { label = "Custom", plain = "unmapped stub", shift = "unmapped stub" },
 	[97] = { label = "Sequencer", plain = "open the MPC step sequencer view", shift = "step sequencer: next bar" },
 	[98] = { label = "Projects", plain = "unmapped stub", shift = "save" },
@@ -201,6 +201,17 @@ local padsColourCache = {} -- pad index -> ARGB int last sent (diff-only mirror)
 local tapTicks = {} -- recent tap-tempo tick timestamps (50 ms per tick)
 local padsLayout = "drum" -- CC 94 mode layout: drum (4x4 bank A) or pads64 (all four banks)
 local boundPadNotes = {} -- grid notes currently routed away from the script
+local keysPage = false -- Chord (CC 95) opened the keys page with pads mode
+local keysPP = false -- we engaged the MPC's Pad Perform mode (melodic tracks only)
+local trackIsMelodicFn = function()
+	return false
+end -- forward declaration; redefined next to firstLayoutForTrack
+
+-- The Pad Perform page may stay open ONLY while the keys page owns the surface
+-- AND the current track is melodic (device rule). Anything else sweeps it.
+local function padPerformPageOurs()
+	return keysPage and keysPP and trackIsMelodicFn()
+end
 local chromaticVirtualPad -- forward declaration (defined with the pad-mode helpers)
 local nativeTap = false -- Shift held + CC 6 routed to the MPC's Tap Tempo control
 local priorLayout, priorPage = nil, nil
@@ -311,7 +322,16 @@ end
 
 function H.popupOpen()
 	local p = H.currentPopup()
-	return p ~= "" and p ~= "No Popup"
+	if p == "" or p == "No Popup" then
+		return false
+	end
+	-- The keys page's own Pad Perform page is not a blocking dialog while the
+	-- keys page owns the surface AND the track is melodic: leaving it open is
+	-- the feature (chord settings on screen). Any other state sweeps it away.
+	if padPerformPageOurs() and p == "Pad Perform" then
+		return false
+	end
+	return true
 end
 
 function H.projectLoaded()
@@ -988,6 +1008,8 @@ local function nudgeQlink(delta)
 	paintAll()
 end
 
+local exitPadsMode -- forward declaration (defined with the pad-mode helpers)
+
 local function enterQlink()
 	if not H.requireProject("qlink page") then
 		return
@@ -997,6 +1019,9 @@ local function enterQlink()
 		H.logOnce("noqlinks", "qlink page unavailable: controlSurface.qlinks missing")
 		return
 	end
+	exitPadsMode() -- the Q-Link page needs the whole grid: any pads-mode note
+	-- bindings (quadrant/64 pads) are handed back, or the bound notes keep
+	-- PLAYING the MPC pads through the page (device-reported on the Mini port)
 	adjustMode = nil
 	tempoMode = false
 	swingMode = false
@@ -1312,7 +1337,7 @@ local function paintTop()
 	elseif padsLayoutAvailable() and H.projectLoaded() then
 		note = C.available
 	end
-	local chord = projectOn and C.available or C.off -- opens the MPC's Pad Perform page on press
+	local chord = (keysPage and C.white) or (projectOn and C.available or C.off) -- keys page owns the grid
 	local custom = C.off -- stub
 	ledCol(TOP.session, session)
 	ledCol(TOP.sequencer, sequencer)
@@ -1583,6 +1608,87 @@ end
 -- opens the MPC's Pad Perform page — the on-screen page with the pad chord/scale
 -- performance modes and their key/scale settings — via controlSurface.padPerform.
 
+-- The virtual padPerform press opens the Pad Perform DIALOG on 3.10.1, not
+-- just the mode. While any dialog is open the popup guard blocks every other
+-- button on the surface. Close it — but ONLY the one we opened; a user's own
+-- dialog (New Project, save prompts, ...) is never dismissed.
+local function closePadPerformPopup()
+	if H.currentPopup() ~= "Pad Perform" then
+		return false
+	end
+	local popups = mpc.ui and mpc.ui.popups
+	local close = H.callable(popups, "CloseCurrentPopup")
+	if not close then
+		H.logOnce("nopopupclose", "Pad Perform dialog cannot be closed: ui.popups.CloseCurrentPopup missing")
+		return false
+	end
+	H.call(close)
+	H.log("pad perform dialog closed")
+	return true
+end
+
+local ppWatchUntil = 0 -- close the Pad Perform dialog for this many ticks after a press
+local pressSurfaceButtonFwd -- forward declaration (defined below)
+
+local function watchPadPerformPopup()
+	-- The dialog opens ASYNCHRONOUSLY on the device (a beat after the press),
+	-- so an immediate close races and loses. For 2 s after each of our presses,
+	-- any "Pad Perform" popup is ours and gets closed; afterwards a dialog YOU
+	-- opened by hand is left alone.
+	if padPerformPageOurs() then
+		return -- our page stays open while keys owns the surface on a melodic track
+	end
+	if ticks < ppWatchUntil and H.currentPopup() == "Pad Perform" then
+		closePadPerformPopup()
+	end
+end
+
+-- padPerform presses must NEVER run right after a screen transition (the
+-- Main press inside enterPadsMode/exit): the host swallows the second press
+-- while the UI settles — Pad Perform then only engaged on the first use
+-- (device report). Every padPerform press is deferred two ticks (~100 ms)
+-- through the timer instead.
+local ppPressAt = nil -- tick deadline for a deferred padPerform toggle
+
+local function deferPadPerformPress()
+	ppPressAt = ticks + 2
+end
+
+local function runDeferredPadPerform()
+	if not ppPressAt or ticks < ppPressAt then
+		return
+	end
+	ppPressAt = nil
+	if pressSurfaceButtonFwd("padPerform") then
+		ppWatchUntil = ticks + 40 -- a dialog arriving AFTER we left gets closed
+		H.log("pad perform toggled (deferred)")
+	else
+		H.logOnce("padperform", "pad perform unavailable: controlSurface.padPerform missing")
+	end
+	if not padPerformPageOurs() then
+		closePadPerformPopup() -- only a page we own stays open
+	end
+end
+
+-- Proactive fault tolerance: entering session, note, chord, user, the mixer or
+-- leaving keys SWEEPS Pad Perform away, even when our bookkeeping desynced.
+-- Evidence-based — the popup name or our keysPP flag — so the clean path
+-- presses nothing.
+local function dismissPadPerform()
+	local popup = H.currentPopup() == "Pad Perform"
+	if not popup and not keysPP then
+		return -- a pending deferred press (if any) still handles the toggle
+	end
+	ppPressAt = nil -- we take over: never toggle twice
+	keysPP = false
+	if pressSurfaceButtonFwd then
+		pressSurfaceButtonFwd("padPerform")
+		H.log("pad perform off (sweep)")
+		ppWatchUntil = ticks + 40 -- the press may reopen the dialog late
+	end
+	closePadPerformPopup()
+end
+
 local function pressSurfaceButton(name)
 	local press = H.callable(mpc.controlSurface and mpc.controlSurface[name], "Press")
 	if press then
@@ -1592,6 +1698,7 @@ local function pressSurfaceButton(name)
 	end
 	return false
 end
+pressSurfaceButtonFwd = pressSurfaceButton
 
 padsLayoutAvailable = function()
 	local pads = dev.mappings and dev.mappings.pads
@@ -1602,22 +1709,75 @@ padsLayoutAvailable = function()
 	return H.callable(pads, field) ~= nil
 end
 
-local function openPadPerformPage()
-	-- Opens the MPC's Pad Perform page: pad chord modes with their key/scale
-	-- selection on the MPC screen.
-	if pressSurfaceButton("padPerform") then
-		H.log("pad perform page open on MPC")
-	else
-		H.logOnce("padperform", "padPerform unavailable on this MPC")
+local firstLayoutForTrack -- forward declarations (defined with the pad-mode helpers)
+local enterPadsMode
+
+-- Chord (CC 95): play the current track's pads from the grid, track-type aware
+-- (ported from the Mini, where three device reports shaped it):
+--   drum track    -> the 4x4 quadrant plays the kit plainly. Pad Perform is NOT
+--                    engaged: its chord/scale transform remaps the kit's pads
+--                    and most of them go silent — a drum kit is not a chord
+--                    instrument.
+--   melodic track -> the quadrant + the MPC's Pad Perform mode: the 16 pads
+--                    play chords/scales. The dialog the virtual press opens is
+--                    closed immediately (it would block every other button).
+-- Pressing Chord again leaves: Pad Perform toggled off (only if we engaged it),
+-- pads mode off, MPC back on its Main screen.
+local function toggleKeysPage()
+	if keysPage then
+		exitPadsMode() -- also leaves the Pad Perform page (MPC back on Main)
+		paintAll()
+		return
 	end
+	if not H.requireProject("keys page") then
+		return
+	end
+	local layout, trackType = firstLayoutForTrack()
+	exitPadsMode()
+	closeGridStates()
+	padsLayout = "drum" -- Pad Perform and plain kit play both drive the 16 pads
+	enterPadsMode()
+	if not padsMode then
+		H.logOnce("padperform", "keys page unavailable: pads mapping missing")
+		paintAll()
+		return
+	end
+	if layout == "pads64" then
+		-- melodic: engage the Pad Perform mode for chords/scales. The press is
+		-- DEFERRED past enterPadsMode's Main press (immediate presses get
+		-- swallowed by the screen transition). The Pad Perform page STAYS OPEN
+		-- (it is the feature's UI) and is swept on the way out.
+		keysPage, keysPP = true, true
+		deferPadPerformPress()
+		H.log("keys page: pad perform chords (" .. tostring(trackType) .. ")")
+	else
+		-- drum kit: play it plainly, no mode toggle, no screen change
+		keysPage, keysPP = true, false
+		H.log("keys page: kit play (drum track)")
+	end
+	paintAll()
 end
 
-local function exitPadsMode()
+exitPadsMode = function()
+	-- The keys page must never outlive the pads mode it was opened with: every
+	-- exit path funnels through here (Main first so the padPerform toggle lands
+	-- in a pads context; the dialog the toggle reopens is closed right after).
+	if keysPage then
+		keysPage = false
+		-- Main first; the padPerform OFF toggle is deferred past the transition
+		if pressSurfaceButton("main") then
+			H.log("keys: back to main")
+		end
+		if keysPP then
+			keysPP = false
+			deferPadPerformPress()
+		end
+	end
+	dismissPadPerform() -- evidence-based immediate sweep (cancels the deferral)
 	if not padsMode then
 		return
 	end
 	padsMode = false
-	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
 	for _, b in ipairs(boundPadNotes) do
 		if b.pad then
@@ -1625,7 +1785,8 @@ local function exitPadsMode()
 		else
 			H.call(pads and pads.RemoveNoteToVirtualPad, 0, b.note)
 		end
-		H.call(m and m.AddNoteToScript, 0, b.note)
+		-- NOTE: no AddNoteToScript here — the script binding is never removed
+		-- (see enterPadsMode); it is only ever added once at OnLoad.
 	end
 	boundPadNotes = {}
 	padsColourCache = {}
@@ -1656,10 +1817,10 @@ chromaticVirtualPad = function(padRow, col)
 	return padRow * 8 + col
 end
 
-local function enterPadsMode()
+enterPadsMode = function()
 	local m = dev.mappings and dev.mappings.script
 	local pads = dev.mappings and dev.mappings.pads
-	if not (m and pads and m.RemoveNoteToScript) then
+	if not (m and pads and m.AddNoteToScript) then
 		H.logOnce("padsmode", "pads mode unavailable: mappings.pads missing")
 		return
 	end
@@ -1685,11 +1846,17 @@ local function enterPadsMode()
 			H.logOnce("padview", "pad view reset unavailable: controlSurface.main missing")
 		end
 	end
+	-- The notes STAY script-bound: AddNoteToScript consumes them from the host's
+	-- MIDI-input feed (device-verified: script-bound notes never reach track
+	-- inputs), while the pad binding fires the program pad in parallel. Removing
+	-- the script binding let the raw channel-0 notes through to any track
+	-- listening on our port — the "playing track 2 also triggers track 1" report.
+	-- The stock MPK hides this with pads on channel 9; the Launchpad cannot
+	-- change its programmer-mode channel, so we consume instead.
 	if padsLayout == "pads64" then
 		for padRow = 0, 7 do
 			for col = 0, 7 do
 				local note = 10 * (padRow + 1) + col + 1
-				H.call(m.RemoveNoteToScript, 0, note)
 				H.call(pads.AddNoteToVirtualPad, 0, note, chromaticVirtualPad(padRow, col))
 				boundPadNotes[#boundPadNotes + 1] = { note = note }
 			end
@@ -1697,7 +1864,6 @@ local function enterPadsMode()
 	else
 		for i = 0, 15 do
 			local note = padsModeNote(i)
-			H.call(m.RemoveNoteToScript, 0, note)
 			H.call(pads.AddNoteToMpcPad, 0, note, i)
 			boundPadNotes[#boundPadNotes + 1] = { note = note, pad = i }
 		end
@@ -1713,13 +1879,17 @@ end
 
 -- Pick the first layout from the current track's Type: pad-based programs (Drum)
 -- get the drum layout, melodic programs (Plugin/Keygroup/MIDI) get chromatic.
-local function firstLayoutForTrack()
+firstLayoutForTrack = function()
 	local t = mpc.tracks and mpc.tracks.currentTrack
 	local trackType = H.propValue(t, "Type")
 	if type(trackType) == "string" and trackType ~= "" and trackType ~= "Drum" then
 		return "pads64", trackType
 	end
 	return "drum", trackType
+end
+
+trackIsMelodicFn = function()
+	return firstLayoutForTrack() == "pads64"
 end
 
 -- Tapping Note toggles the pads mode with the layout fixed by the track type:
@@ -1734,6 +1904,7 @@ local function togglePadsMode()
 		local layout, trackType = firstLayoutForTrack()
 		padsLayout = layout
 		H.log("track type " .. tostring(trackType or "?") .. " -> " .. layout)
+		exitPadsMode() -- clears a stray keysPage (degraded padPerform entry)
 		closeGridStates()
 		enterPadsMode()
 		if padsMode then
@@ -2319,7 +2490,11 @@ function LaunchpadProMK3.HandleMIDINoteOn(channel, note, velocity)
 	local col, row = noteIndex(note)
 	if col then
 		if padsMode then
-			return -- a pad mode owns the grid; the unbound pads stay inert
+			-- a pad mode owns the grid. The pad binding fired the MPC pad; the
+			-- script binding consumed the note so it cannot reach track inputs.
+			-- This line firing is the on-device proof of that consumption.
+			H.logOnce("padnote-consumed", "pad note consumed by script binding (not forwarded)")
+			return
 		end
 		if velocity > 0 then
 			if heldFunction == "stopClip" then
@@ -2543,6 +2718,7 @@ end
 local PRESS = {
 	[TOP.shift] = shiftPress,
 	[TOP.session] = function()
+		dismissPadPerform() -- a stuck Pad Perform must never block the escape
 		setMode("clip")
 	end,
 	[TOP.sequencer] = function()
@@ -2553,10 +2729,11 @@ local PRESS = {
 		openStepSeq()
 	end,
 	[TOP.note] = function()
+		dismissPadPerform() -- a chord-mangled surface must not leak into pads mode
 		togglePadsMode()
 		paintAll()
 	end,
-	[TOP.chord] = openPadPerformPage,
+	[TOP.chord] = toggleKeysPage,
 	[TOP.custom] = function()
 		H.logOnce("custom", "custom button: unmapped")
 	end,
@@ -2647,6 +2824,22 @@ end
 LaunchpadProMK3.ACTIONS = ACTIONS
 LaunchpadProMK3.PALETTE = C
 
+-- State-machine snapshot for the tests and for on-device diagnosis.
+LaunchpadProMK3.STATE = function()
+	return {
+		padsMode = padsMode,
+		padsLayout = padsLayout,
+		keysPage = keysPage,
+		keysPP = keysPP,
+		adjustMode = adjustMode,
+		tempoMode = tempoMode,
+		swingMode = swingMode,
+		qlinkMode = qlinkMode,
+		qlinkPage = qlinkPage,
+		boundPadNotes = #boundPadNotes,
+	}
+end
+
 function LaunchpadProMK3.HandleMIDICC(channel, cc, value)
 	if channel ~= 0 then
 		return
@@ -2708,6 +2901,14 @@ end
 
 function LaunchpadProMK3.HandleTimer()
 	ticks = ticks + 1
+	-- the page may stay open only while keys owns AND the track is melodic:
+	-- a track switch to drums drops the chords (kit play remains)
+	if keysPage and keysPP and not trackIsMelodicFn() then
+		H.log("keys page: track is not melodic anymore - chords off, kit play")
+		dismissPadPerform()
+	end
+	runDeferredPadPerform()
+	watchPadPerformPopup()
 	-- timer runs at 50 ms; blink at 2 Hz (every 5 ticks) and full repaint every 2 s
 	if ticks % 5 == 0 then
 		blinkOn = not blinkOn
@@ -2774,6 +2975,8 @@ function LaunchpadProMK3.OnLoad()
 	followMode = false
 	padsMode = false
 	padsLayout = "drum"
+	keysPage = false
+	keysPP = false
 	padsColourCache = {}
 	clipOp = nil
 	clipOrigin = nil
@@ -2893,6 +3096,8 @@ function LaunchpadProMK3.OnUnload()
 	qlinkMode = false
 	qlinkPage = 0
 	qlinkCol = 0
+	keysPage = false
+	keysPP = false
 	clipOp = nil
 	clipOrigin = nil
 	if programmerEntered then

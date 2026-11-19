@@ -27,7 +27,7 @@ MPC clip matrix; the arrows move the window. Row 0 is the top row of pads.
 | 92 | Right | move the clip window right | next track |
 | 93 | Session | clip grid (leaves every page) | toggle follow-current-track |
 | 94 | Note | MPC pads mode (layout from the track type) | previous plugin preset |
-| 95 | Chord | open the MPC Pad Perform page | next plugin preset |
+| 95 | Chord | play the track's pads from the grid — kits plainly, melodic tracks with Pad Perform chords (repeat: leave) | next plugin preset |
 | 96 | Custom | unmapped stub | unmapped stub |
 | 97 | Sequencer | open the MPC step sequencer view | step sequencer: next bar |
 | 98 | Projects | unmapped stub | save |

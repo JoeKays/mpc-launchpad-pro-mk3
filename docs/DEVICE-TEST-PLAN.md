@@ -52,6 +52,15 @@ journalctl -u acvs -o cat --no-pager | grep LaunchpadProMK3
 2. Press 80/70. Expect `MoveUp(1)` / `MoveDown(1)`.
 3. Shift + 91/92/80/70. Expect the move by 8.
 
+## 4b. Chord (CC 95) — the keys page, ported from the Mini
+
+| # | Step | Expected |
+|---|------|----------|
+| 4b.1 | Chord on a DRUM track | quadrant plays the kit plainly — no Pad Perform, no dialog, no screen change; journal `keys page: kit play (drum track)`; chord LED white while open |
+| 4b.2 | Chord on a MELODIC track | Pad Perform chords; journal `pad perform chords (...)` + `pad perform dialog closed`; every other button stays live WHILE open |
+| 4b.3 | Chord repeat / Note / Session / Q-Link from the keys page | leaves cleanly (`pad perform off` when we engaged it, Main screen, bindings restored, clip grid works) |
+| 4b.4 | A dialog YOU open (New Project etc.) | never auto-closed by the script |
+
 ## 5. Track functions
 
 1. Hold CC 1 (record arm), press CC 101 (track 0). Expect `hold recArm`, then

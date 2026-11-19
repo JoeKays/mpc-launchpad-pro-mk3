@@ -13,3 +13,6 @@ build/
 
 # Development artifacts (local paths)
 dev/
+
+# Local compile artifacts
+luac.out

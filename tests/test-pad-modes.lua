@@ -31,13 +31,14 @@ L.HandleTimer()
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("AddNoteToMpcPad"), 16, "16 pads bound")
-assert_eq(mock.count("RemoveNoteToScript"), 16, "16 notes unbound from the script")
+-- notes STAY script-bound now: the script binding consumes them from the host's
+-- MIDI-input feed (device report: pads double-fed a track listening on our port)
+assert_eq(mock.count("RemoveNoteToScript"), 0, "notes stay bound to the script")
 for i, note in ipairs(PAD_NOTES) do
 	local add = mock.find("AddNoteToMpcPad")[i]
 	assert_eq(add.args[1], 0, "pads enter channel " .. i)
 	assert_eq(add.args[2], note, "pads enter note " .. i)
 	assert_eq(add.args[3], i - 1, "pads enter pad index " .. i)
-	assert_eq(mock.find("RemoveNoteToScript")[i].args[2], note, "pads enter unbound note " .. i)
 end
 assert_eq(mock.leds[94][1], 127, "note button white in pads mode")
 assert_eq(mock.leds[85][1], 0, "pad outside the quadrant went dark")
@@ -102,7 +103,8 @@ assert_eq(mock.count("MoveUp"), 1, "up moves the window again")
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("AddNoteToVirtualPad"), 0, "no chromatic on a drum track")
-assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the drum notes")
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "exit releases the pad bindings")
+assert_eq(mock.count("AddNoteToScript"), 0, "script bindings were never removed")
 assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
@@ -131,29 +133,130 @@ L.HandleMIDICC(0, 94, 127)
 mock.reset()
 L.OnUnload()
 assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "unload exits pads mode")
-assert_eq(mock.count("AddNoteToScript"), 16, "unload restores the notes")
+assert_eq(mock.count("AddNoteToScript"), 0, "unload does not re-add (notes were never unbound)")
+assert_eq(mock.count("RemoveNoteToScript"), 64, "unload unmaps the grid notes")
 
--- CC 95 opens the MPC's Pad Perform page (pad chord modes + key/scale on the
--- MPC screen), inside or outside pads mode. No pad-utility cycling anymore.
+-- CC 95 (chord) is the keys page: pads mode from the grid, track-type aware.
+-- Drum track (the mock default): plain kit play — Pad Perform is NEVER engaged
+-- (its chord transform remaps a kit's pads and most go silent), and the press
+-- opens no dialog.
 mock.reset()
-L.HandleMIDICC(0, 94, 127) -- enter pads mode
-L.HandleMIDICC(0, 95, 127) -- chord -> Pad Perform page
-assert_eq(mock.count("padPerform.Press"), 1, "padPerform pressed inside pads mode")
-assert_eq(mock.count("noteRepeat.Press"), 0, "no pad utility cycling")
-assert_eq(mock.leds[95][1], 60, "chord button available LED")
+L.HandleMIDICC(0, 94, 127) -- enter pads mode (note button)
+L.HandleMIDICC(0, 93, 127) -- session -> back out (clean slate)
+mock.reset()
+L.HandleMIDICC(0, 95, 127) -- chord -> keys page (drum track)
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "keys page enters pads mode (quadrant)")
+assert_eq(mock.count("padPerform.Press"), 0, "no Pad Perform on a drum track")
+assert_eq(mock.count("CloseCurrentPopup"), 0, "no dialog opened")
+L.HandleMIDINoteOn(0, 11, 100)
+assert_eq(mock.count("TriggerClip"), 0, "grid plays the kit, not clips")
+L.HandleMIDICC(0, 95, 127) -- chord again: leave
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "keys page exits pads mode")
+assert_eq(mock.count("padPerform.Press"), 0, "drum-track keys never touches Pad Perform")
+assert_eq(mock.count("main.Press"), 2, "main pressed on keys enter (pad view) and exit")
+L.HandleMIDINoteOn(0, 11, 100)
+assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after keys exit")
+
+-- Melodic track (Plugin): Pad Perform chords, every toggle press deferred two
+-- ticks past the Main-screen transition (immediate presses get swallowed).
+mock.mpc.tracks.currentTrack.Type:set("Plugin")
+mock.reset()
+local function tick2()
+	L.HandleTimer()
+	L.HandleTimer() -- the deferred padPerform press lands
+end
+L.HandleMIDICC(0, 95, 127) -- keys -> pads mode + Pad Perform
+tick2()
+assert_eq(mock.count("padPerform.Press"), 1, "melodic keys engages Pad Perform (deferred)")
+assert_eq(mock.count("CloseCurrentPopup"), 0, "the Pad Perform page STAYS OPEN on enter (it is the feature's UI)")
+-- repeated cycles: each entry must engage again
+L.HandleMIDICC(0, 95, 127) -- leave
+tick2()
+assert_eq(mock.count("padPerform.Press"), 2, "exit toggles off (deferred)")
+L.HandleMIDICC(0, 95, 127) -- enter AGAIN
+tick2()
+assert_eq(mock.count("padPerform.Press"), 3, "second entry engages Pad Perform again")
+L.HandleMIDICC(0, 95, 127) -- leave
+tick2()
+assert_eq(mock.count("padPerform.Press"), 4, "second exit toggles off")
+assert_eq(mock.count("main.Press"), 4, "main on every enter+exit")
+
+-- THE DEVICE RULE: the page stays open only while keys owns AND the track is
+-- melodic. Switching to a drum track while it is open drops the chords.
+L.HandleMIDICC(0, 95, 127) -- enter keys (melodic)
+tick2()
+local closedBefore = mock.count("CloseCurrentPopup")
+mock.setPopup("Pad Perform")
+L.HandleTimer() -- still melodic -> stays open
+assert_eq(mock.count("CloseCurrentPopup"), closedBefore, "page stays open on a melodic track")
+mock.mpc.tracks.currentTrack.Type:set("Drum")
+L.HandleTimer() -- demotion
+assert_eq(mock.count("CloseCurrentPopup"), closedBefore + 1, "page closed on the drum switch")
+assert_eq(L.STATE().keysPage, true, "keys page still owns (kit play)")
+L.HandleMIDICC(0, 95, 127) -- leave for the sections below
+tick2()
+mock.setPopup("No Popup")
+-- with the dialog closed, the surface stays live
+L.HandleMIDICC(0, 93, 127) -- session works after the keys round trip
+L.HandleMIDINoteOn(0, 11, 100)
+assert_eq(mock.count("TriggerClip"), 1, "clip grid works after the keys round trip")
+-- a dialog we did NOT open is never dismissed
+mock.setPopup("New Project")
+mock.reset()
+L.HandleMIDICC(0, 95, 127)
+assert_eq(mock.count("CloseCurrentPopup"), 0, "foreign dialogs are never closed")
+assert_eq(mock.mpc.engineMode.GetCurrentPopup(), "New Project", "New Project dialog stays")
+mock.setPopup("No Popup")
+mock.mpc.tracks.currentTrack.Type:set("Drum")
+
+-- ASYNC dialog (device report): the dialog opens a beat AFTER the exit press.
+mock.mpc.tracks.currentTrack.Type:set("Plugin")
+mock.reset()
+L.HandleMIDICC(0, 95, 127) -- keys -> chords
+tick2()
+L.HandleMIDICC(0, 95, 127) -- leave
+tick2()
+mock.setPopup("Pad Perform") -- the dialog lands late
+L.HandleTimer() -- watcher tick: inside the window
+assert_eq(mock.mpc.engineMode.GetCurrentPopup(), "No Popup", "late dialog closed by the watcher")
+assert_eq(mock.count("TriggerClip"), 0, "still in the keys-exit state")
+
+-- PROACTIVE SWEEP: a stuck Pad Perform (popup open, flags clear) is swept by
+-- any mode switch; the clean path presses nothing.
+mock.setPopup("Pad Perform")
+mock.reset()
+L.HandleMIDICC(0, 93, 127) -- session
+assert_eq(mock.count("CloseCurrentPopup"), 1, "session sweeps the stuck dialog")
+assert_eq(mock.count("padPerform.Press"), 1, "session toggles the stuck mode off")
+assert_eq(mock.mpc.engineMode.GetCurrentPopup(), "No Popup", "popup cleared")
+L.HandleMIDINoteOn(0, 11, 100)
+assert_eq(mock.count("TriggerClip"), 1, "clip grid alive after the sweep")
+-- note (drums) sweep
+mock.setPopup("Pad Perform")
+mock.reset()
+L.HandleMIDICC(0, 94, 127)
+assert_eq(mock.count("CloseCurrentPopup"), 1, "note sweeps the stuck dialog")
+-- clean path: no popup, no flags -> no extra presses
+mock.reset()
+L.HandleMIDICC(0, 93, 127)
+assert_eq(mock.count("padPerform.Press"), 0, "clean path presses nothing")
+mock.mpc.tracks.currentTrack.Type:set("Drum")
 
 -- Exiting pads mode (CC 93 session) no longer touches pad utilities.
 mock.reset()
+L.HandleMIDICC(0, 94, 127) -- enter pads mode
 L.HandleMIDICC(0, 93, 127) -- session -> clip mode
 assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "session exits pads mode")
 assert_eq(mock.count("noteRepeat.Press"), 0, "no utility presses on exit")
 assert_eq(mock.count("keyboardControl.Press"), 0, "no page press on exit")
 assert_eq(mock.count("padPerform.Press"), 0, "no padPerform press on exit")
 
--- Outside pads mode CC 95 still opens the Pad Perform page.
+-- Outside pads mode CC 95 opens the keys page (drum track: no Pad Perform).
 mock.reset()
 L.HandleMIDICC(0, 95, 127)
-assert_eq(mock.count("padPerform.Press"), 1, "padPerform pressed outside pads mode")
+assert_eq(mock.count("AddNoteToMpcPad"), 16, "keys page from clip mode")
+assert_eq(mock.count("padPerform.Press"), 0, "no Pad Perform on a drum track")
+L.HandleMIDICC(0, 95, 127) -- leave again
 
 -- Track type fixes the layout: drum tracks toggle drum <-> clip grid (2-state).
 mock.reset()
@@ -162,7 +265,8 @@ assert_eq(mock.count("AddNoteToMpcPad"), 16, "drum layout for a drum track")
 mock.reset()
 L.HandleMIDICC(0, 94, 127) -- exit (single tap, never chromatic)
 assert_eq(mock.count("AddNoteToVirtualPad"), 0, "no chromatic on a drum track")
-assert_eq(mock.count("AddNoteToScript"), 16, "exit restores the drum notes")
+assert_eq(mock.count("RemoveNoteToMpcPad"), 16, "exit releases the pad bindings")
+assert_eq(mock.count("AddNoteToScript"), 0, "script bindings were never removed")
 assert_eq(mock.leds[94][1], 60, "note button back to available")
 L.HandleMIDINoteOn(0, 11, 100)
 assert_eq(mock.count("TriggerClip"), 1, "clip launch restored after pads exit")
@@ -194,7 +298,7 @@ assert_eq(mock.leds[61][2], 127, "virtual pad 41 colour mirrored g (row 6)")
 mock.reset()
 L.HandleMIDICC(0, 94, 127)
 assert_eq(mock.count("RemoveNoteToVirtualPad"), 64, "exit unbinds the virtual pads")
-assert_eq(mock.count("AddNoteToScript"), 64, "exit restores the notes")
+assert_eq(mock.count("AddNoteToScript"), 0, "script bindings were never removed")
 assert_eq(mock.count("bank1.Press"), 1, "leaving 64-pads resets the pad bank")
 assert_eq(mock.count("AddNoteToMpcPad"), 0, "64-pads exit never binds drums")
 mock.mpc.tracks.currentTrack.Type.value = "Drum"

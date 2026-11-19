@@ -466,6 +466,9 @@ local timer = {
 	end,
 }
 
+-- settable popup name for tests (the Pad Perform dialog simulation)
+local popupProp = prop("No Popup")
+
 -- assemble
 local normalTrackCount = 8
 local currentIndex = prop(0)
@@ -562,9 +565,19 @@ local mpc = {
 				record("keyboardControl.Release")
 			end,
 		},
+		main = {
+			Press = function()
+				record("main.Press")
+			end,
+			Release = function()
+				record("main.Release")
+			end,
+		},
 		padPerform = {
 			Press = function()
 				record("padPerform.Press")
+				-- device behaviour: the press opens the Pad Perform dialog
+				popupProp.value = "Pad Perform"
 			end,
 			Release = function()
 				record("padPerform.Release")
@@ -610,12 +623,12 @@ local mpc = {
 	},
 	engineMode = {
 		CurrentMode = prop("clip"),
-		CurrentPopup = prop("No Popup"),
+		CurrentPopup = popupProp,
 		GetCurrentMode = function()
 			return "clip"
 		end,
 		GetCurrentPopup = function()
-			return "No Popup"
+			return popupProp.value
 		end,
 	},
 }
@@ -672,6 +685,21 @@ end
 
 function M.count(name)
 	return #M.find(name)
+end
+
+-- ui.popups: CloseCurrentPopup only touches the popup the tests opened
+mpc.ui = {
+	popups = {
+		CloseCurrentPopup = function()
+			record("CloseCurrentPopup")
+			popupProp.value = "No Popup"
+		end,
+	},
+}
+
+--- set the popup the script will see (tests simulate the Pad Perform dialog)
+function M.setPopup(name)
+	popupProp.value = name
 end
 
 return M
